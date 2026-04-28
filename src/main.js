@@ -354,14 +354,14 @@ function showIncomingCall(data) {
   callStatus.innerText = `Incoming ${data.callType} Call...`;
   acceptCallBtn.classList.remove('hidden');
   callOverlay.classList.remove('hidden');
-  acceptCallBtn.onclick = () => acceptCall(data.from);
+  acceptCallBtn.onclick = () => acceptCall(data.from, data.callType);
 }
 
-async function acceptCall(callerUid) {
+async function acceptCall(callerUid, callType) {
   callStatus.innerText = "Connecting...";
   peerConnection = new RTCPeerConnection(servers);
   remoteStream = new MediaStream();
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'Video', audio: true });
   localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
   localVideo.srcObject = localStream;
   videoContainer.style.display = 'block';
@@ -399,8 +399,13 @@ function toggleMic() {
 
 function toggleVideo() {
   if (!localStream) return;
+  const videoTrack = localStream.getVideoTracks()[0];
+  if (!videoTrack) {
+    alert("This is an audio-only call.");
+    return;
+  }
   isVideoOff = !isVideoOff;
-  localStream.getVideoTracks()[0].enabled = !isVideoOff;
+  videoTrack.enabled = !isVideoOff;
   toggleVideoBtn.classList.toggle('muted', isVideoOff);
   const icon = toggleVideoBtn.querySelector('i');
   icon.setAttribute('data-lucide', isVideoOff ? 'video-off' : 'video');
