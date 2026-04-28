@@ -4,11 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexus | Premium Communication</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <meta name="description" content="Nexus is a premium real-time communication platform for modern teams.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
 </head>
 <body class="dark-theme">
   <div id="auth-screen" class="auth-overlay">
@@ -138,9 +140,11 @@
             <!-- Messages injected here -->
           </div>
 
-          <footer class="chat-footer">
-            <button class="icon-btn"><i data-lucide="smile"></i></button>
-            <button class="icon-btn"><i data-lucide="paperclip"></i></button>
+          <footer class="chat-footer" style="position: relative;">
+            <emoji-picker class="hidden" id="emoji-picker" style="position: absolute; bottom: 80px; left: 20px; z-index: 100; --background: var(--bg-sidebar); --border-color: var(--border); --text-color: var(--text-primary); --category-font-color: var(--text-secondary);"></emoji-picker>
+            <button class="icon-btn" id="emoji-btn"><i data-lucide="smile"></i></button>
+            <button class="icon-btn" id="attach-btn"><i data-lucide="paperclip"></i></button>
+            <input type="file" id="chat-image-upload" accept="image/*" class="hidden">
             <div class="message-input-wrapper">
               <input type="text" placeholder="Type a message" id="message-input">
             </div>

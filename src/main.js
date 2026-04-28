@@ -35,6 +35,10 @@ const activeChatInfo = document.getElementById('active-chat-info');
 const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
+const attachBtn = document.getElementById('attach-btn');
+const chatImageUpload = document.getElementById('chat-image-upload');
+const emojiBtn = document.getElementById('emoji-btn');
+const emojiPicker = document.getElementById('emoji-picker');
 const themeToggleBtn = document.getElementById('theme-toggle');
 const settingsThemeToggleBtn = document.getElementById('settings-theme-toggle');
 const chatSearch = document.getElementById('chat-search');
@@ -204,6 +208,7 @@ function switchChat(id) {
   const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
   const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png');
   welcomeScreen.classList.add('hidden'); activeChatScreen.classList.remove('hidden', 'active'); activeChatScreen.classList.add('active'); 
+  document.querySelector('.chat-window').classList.add('active');
   activeChatInfo.innerHTML = `<img src="${chatAvatar}" alt="${chatName}" class="avatar"><div class="chat-info-text"><h3>${chatName}</h3><span>${chat.type === 'public' ? 'Global Channel' : 'Direct Message'}</span></div>`;
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages(); updateInfoPanel(chat);
 }
@@ -215,11 +220,12 @@ function refreshMessages() {
 }
 
 function renderMessages(messages, filter = '') {
-  const filtered = messages.filter(m => m.text.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = messages.filter(m => (m.text || '').toLowerCase().includes(filter.toLowerCase()));
   messagesContainer.innerHTML = filtered.map(msg => `
     <div class="message ${msg.senderId === currentUser.uid ? 'self' : 'other'}">
       ${msg.senderId !== currentUser.uid ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
-      <p>${msg.text}</p>
+      ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
+      ${msg.text ? `<p>${msg.text}</p>` : ''}
       <div class="message-time">${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}${msg.senderId === currentUser.uid ? `<i data-lucide="check-check" class="status-icon read"></i>` : ''}</div>
     </div>
   `).join(''); lucide.createIcons(); messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -230,6 +236,23 @@ async function sendMessage() {
   const chatRef = doc(db, "chats", activeChatId); const msgRef = collection(chatRef, "messages"); messageInput.value = '';
   await addDoc(msgRef, { text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() });
   await setDoc(chatRef, { lastMessage: text, lastMessageTime: serverTimestamp() }, { merge: true });
+}
+
+async function uploadChatImage(file) {
+  if (!file || !activeChatId) return;
+  const chatRef = doc(db, "chats", activeChatId); 
+  const msgRef = collection(chatRef, "messages");
+  try {
+    const ext = file.name.split('.').pop();
+    const storageRef = ref(storage, `chat_images/${activeChatId}/${Date.now()}.${ext}`);
+    await uploadBytes(storageRef, file);
+    const imageUrl = await getDownloadURL(storageRef);
+    await addDoc(msgRef, { text: '', imageUrl, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() });
+    await setDoc(chatRef, { lastMessage: '📷 Image', lastMessageTime: serverTimestamp() }, { merge: true });
+  } catch (error) {
+    console.error("Image upload failed", error);
+    alert("Failed to send image.");
+  }
 }
 
 async function showUserList(filter = '') {
@@ -411,14 +434,60 @@ async function toggleTheme() {
   if (currentUser) await setDoc(doc(db, "users", currentUser.uid), { theme: isDarkTheme ? 'dark' : 'light' }, { merge: true });
 }
 
+async function isUsernameUnique(username, uid) {
+  const q = query(collection(db, "users"), where("username", "==", username.toLowerCase()), limit(1));
+  const snapshot = await getDocs(q);
+  return snapshot.empty || snapshot.docs[0].id === uid;
+}
+
+async function handleAvatarUpload(file) {
+  if (!file) return;
+  editAvatarBtn.innerHTML = '<i data-lucide="loader" class="animate-spin"></i>';
+  lucide.createIcons();
+  try {
+    const storageRef = ref(storage, `avatars/${currentUser.uid}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    currentUser.avatar = downloadURL;
+    myProfileImg.src = downloadURL;
+    document.querySelector('.user-profile img').src = downloadURL;
+    await setDoc(doc(db, "users", currentUser.uid), { avatar: downloadURL }, { merge: true });
+    editAvatarBtn.innerHTML = '<i data-lucide="camera"></i>';
+    lucide.createIcons();
+  } catch (error) {
+    alert("Upload failed.");
+    editAvatarBtn.innerHTML = '<i data-lucide="camera"></i>';
+    lucide.createIcons();
+  }
+}
+
 function setupEventListeners() {
   loginBtn.addEventListener('click', handleLogin); sendBtn.addEventListener('click', sendMessage);
   messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+  attachBtn.addEventListener('click', () => chatImageUpload.click());
+  chatImageUpload.addEventListener('change', (e) => {
+    if (e.target.files[0]) uploadChatImage(e.target.files[0]);
+    e.target.value = '';
+  });
+  emojiBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    emojiPicker.classList.toggle('hidden');
+  });
+  emojiPicker.addEventListener('emoji-click', event => {
+    messageInput.value += event.detail.unicode;
+    emojiPicker.classList.add('hidden');
+    messageInput.focus();
+  });
   themeToggleBtn.addEventListener('click', toggleTheme); settingsThemeToggleBtn.addEventListener('click', toggleTheme);
   chatSearch.addEventListener('input', (e) => renderChatList(e.target.value));
   infoToggle.addEventListener('click', () => infoPanel.classList.toggle('hidden'));
   closeInfo.addEventListener('click', () => infoPanel.classList.add('hidden'));
-  backBtn.addEventListener('click', () => { activeChatScreen.classList.remove('active', 'hidden'); welcomeScreen.classList.remove('hidden'); activeChatScreen.classList.add('hidden'); });
+  backBtn.addEventListener('click', () => { 
+    activeChatScreen.classList.remove('active', 'hidden'); 
+    welcomeScreen.classList.remove('hidden'); 
+    activeChatScreen.classList.add('hidden'); 
+    document.querySelector('.chat-window').classList.remove('active');
+  });
   profileBtn.addEventListener('click', () => profileModal.classList.remove('hidden'));
   closeProfile.addEventListener('click', () => profileModal.classList.add('hidden'));
   editAvatarBtn.addEventListener('click', () => avatarInput.click());
@@ -436,7 +505,12 @@ function setupEventListeners() {
   closeNewChat.addEventListener('click', () => newChatModal.classList.add('hidden'));
   userSearchInput.addEventListener('input', (e) => showUserList(e.target.value));
   menuBtn.addEventListener('click', (e) => { e.stopPropagation(); mainMenu.classList.toggle('hidden'); });
-  document.addEventListener('click', () => mainMenu.classList.add('hidden'));
+  document.addEventListener('click', (e) => { 
+    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+      emojiPicker.classList.add('hidden');
+    }
+    mainMenu.classList.add('hidden'); 
+  });
   logoutBtn.addEventListener('click', () => { if(confirm('Log out?')) signOut(auth); });
   menuProfileBtn.addEventListener('click', () => profileModal.classList.remove('hidden'));
   menuSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));

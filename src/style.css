@@ -452,6 +452,18 @@ h1, h2, h3 {
   border-bottom-left-radius: 4px;
 }
 
+.message-image {
+  max-width: 100%;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.message-image:hover {
+  transform: scale(1.02);
+}
+
 .message-time {
   font-size: 0.7rem;
   margin-top: 4px;
