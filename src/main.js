@@ -294,14 +294,15 @@ async function startCall(type) {
   localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'Video', audio: true });
   localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
   localVideo.srcObject = localStream;
+  if (type === 'Video') localVideo.classList.remove('hidden');
   videoContainer.style.display = 'block';
 
   peerConnection.ontrack = (event) => {
     event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
     remoteVideo.srcObject = remoteStream;
     remoteVideo.play().catch(e => console.error("Playback failed", e));
-    callStatus.innerText = "On Real Call";
-    callInfoOverlay.style.opacity = '0.2';
+    ringingInfo.style.opacity = '0';
+    setTimeout(() => ringingInfo.classList.add('hidden'), 400);
   };
 
   const callDoc = doc(collection(db, "calls"), otherUid);
@@ -364,6 +365,7 @@ async function acceptCall(callerUid, callType) {
   localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'Video', audio: true });
   localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
   localVideo.srcObject = localStream;
+  if (callType === 'Video') localVideo.classList.remove('hidden');
   videoContainer.style.display = 'block';
   peerConnection.ontrack = (event) => {
     event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
@@ -371,7 +373,6 @@ async function acceptCall(callerUid, callType) {
     remoteVideo.play().catch(e => console.error("Playback failed", e));
     ringingInfo.style.opacity = '0';
     setTimeout(() => ringingInfo.classList.add('hidden'), 400);
-    localVideo.classList.remove('hidden');
   };
   const callDoc = doc(db, "calls", currentUser.uid);
   const offerCandidates = collection(callDoc, "offerCandidates");
