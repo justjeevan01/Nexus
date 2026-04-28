@@ -336,14 +336,16 @@ async function startCall(type) {
     }
     const data = snapshot.data();
     if (peerConnection && !peerConnection.currentRemoteDescription && data?.answer) {
-      peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(console.error);
+      peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
+        .then(() => {
+          onSnapshot(answerCandidates, (candSnapshot) => {
+            candSnapshot.docChanges().forEach((change) => {
+              if (change.type === 'added') peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+            });
+          });
+        })
+        .catch(console.error);
     }
-  });
-
-  onSnapshot(answerCandidates, (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === 'added') peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-    });
   });
 }
 
