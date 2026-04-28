@@ -1,6 +1,6 @@
 import './style.css';
 import { auth, googleProvider, db, storage } from './firebase';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "firebase/auth";
+import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -89,35 +89,63 @@ const toggleMicBtn = document.getElementById('toggle-mic');
 const toggleVideoBtn = document.getElementById('toggle-video');
 
 // --- AUTH LOGIC ---
-getRedirectResult(auth).catch((error) => console.error("Redirect Error:", error));
+
+console.log("Auth System Initialized...");
+
 onAuthStateChanged(auth, async (user) => {
   try {
     if (user) {
+      console.log("User detected:", user.uid);
       const userDocRef = doc(db, "users", user.uid);
       let userDoc = await getDoc(userDocRef);
       const userData = userDoc.exists() ? userDoc.data() : null;
+
       currentUser = {
         uid: user.uid, name: userData?.name || user.displayName, username: userData?.username || '',
         email: user.email, avatar: userData?.avatar || user.photoURL, status: userData?.status || 'Available', theme: userData?.theme || 'dark'
       };
+
       if (!userDoc.exists()) await setDoc(userDocRef, currentUser);
+
       isDarkTheme = currentUser.theme === 'dark'; applyTheme(); showApp(); loadChats(); updateProfileUI(); ensureGlobalChannel(); listenForCalls();
       if (!currentUser.username) {
         setTimeout(() => { profileModal.classList.remove('hidden'); usernameHint.innerText = "Set a unique username."; }, 1000);
       }
-    } else { showAuth(); }
-  } catch (error) { console.error("Auth Error:", error); }
+    } else {
+      console.log("No user session found.");
+      showAuth();
+    }
+  } catch (error) {
+    console.error("Critical Auth Error:", error);
+    alert("Database connection failed. Please check your internet or Firebase rules.");
+  }
 });
 
 async function handleLogin() {
   try {
+    console.log("Starting Login Popup...");
     loginBtn.innerHTML = '<i data-lucide="loader" class="animate-spin"></i> <span>Connecting...</span>';
-    lucide.createIcons(); await signInWithRedirect(auth, googleProvider);
-  } catch (error) { alert("Login failed: " + error.message); loginBtn.innerHTML = '<span>Sign in with Google</span>'; lucide.createIcons(); }
+    lucide.createIcons();
+    await signInWithPopup(auth, googleProvider);
+    console.log("Login Successful!");
+  } catch (error) {
+    console.error("Login Error:", error.code, error.message);
+    alert("Login failed: " + error.message);
+    loginBtn.innerHTML = '<span>Sign in with Google</span>';
+    lucide.createIcons();
+  }
 }
 
-function showApp() { authScreen.classList.add('hidden'); appEl.classList.remove('hidden'); }
-function showAuth() { authScreen.classList.remove('hidden'); appEl.classList.add('hidden'); }
+function showApp() { 
+  console.log("Switching to App Screen");
+  authScreen.classList.add('hidden'); 
+  appEl.classList.remove('hidden'); 
+}
+
+function showAuth() { 
+  authScreen.classList.remove('hidden'); 
+  appEl.classList.add('hidden'); 
+}
 
 // --- CORE LOGIC ---
 async function ensureGlobalChannel() {
