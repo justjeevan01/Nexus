@@ -297,6 +297,12 @@ async function startCall(type) {
   peerConnection = new RTCPeerConnection(servers);
   remoteStream = new MediaStream();
 
+  peerConnection.onconnectionstatechange = () => {
+    if (peerConnection && ['disconnected', 'failed', 'closed'].includes(peerConnection.connectionState)) {
+      endCall();
+    }
+  };
+
   localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'Video', audio: true });
   localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
   localVideo.srcObject = localStream;
@@ -375,6 +381,13 @@ async function acceptCall(callerUid, callType) {
   currentCallUserId = callerUid;
   peerConnection = new RTCPeerConnection(servers);
   remoteStream = new MediaStream();
+
+  peerConnection.onconnectionstatechange = () => {
+    if (peerConnection && ['disconnected', 'failed', 'closed'].includes(peerConnection.connectionState)) {
+      endCall();
+    }
+  };
+
   localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'Video', audio: true });
   localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
   localVideo.srcObject = localStream;
