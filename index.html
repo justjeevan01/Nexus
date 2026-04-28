@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus | Premium Communication</title>
+  <meta name="description" content="Nexus is a premium real-time communication platform for modern teams.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="dark-theme">
+  <div id="auth-screen" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <svg viewBox="0 0 100 100" class="nexus-logo">
+          <defs>
+            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:hsl(160, 60%, 55%);stop-opacity:1" />
+              <stop offset="100%" style="stop-color:hsl(190, 70%, 50%);stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <path d="M20,30 L50,10 L80,30 L80,70 L50,90 L20,70 Z" fill="none" stroke="url(#logo-grad)" stroke-width="6" stroke-linejoin="round"/>
+          <path d="M35,40 L50,55 L65,40 M50,55 L50,85" fill="none" stroke="url(#logo-grad)" stroke-width="8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1>Nexus</h1>
+      <p>Connect with style. Experience the future of communication.</p>
+      <button class="google-login-btn" id="login-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48">
+          <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+          <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+          <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+          <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+        </svg>
+        <span>Sign in with Google</span>
+      </button>
+      <div class="auth-footer">
+        <span>Premium Experience</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <header class="sidebar-header">
+          <div class="user-profile">
+            <img src="/images/user1.png" alt="My Profile" class="avatar">
+            <div class="status-indicator online"></div>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" id="theme-toggle" title="Toggle Theme">
+              <i data-lucide="moon"></i>
+            </button>
+            <button class="icon-btn" id="new-chat-btn" title="New Chat">
+              <i data-lucide="plus"></i>
+            </button>
+            <div class="dropdown">
+              <button class="icon-btn" id="menu-btn" title="More Options">
+                <i data-lucide="more-vertical"></i>
+              </button>
+              <div class="dropdown-content hidden" id="main-menu">
+                <button class="menu-item" id="menu-profile">
+                  <i data-lucide="user"></i> <span>Profile</span>
+                </button>
+                <button class="menu-item" id="menu-settings">
+                  <i data-lucide="settings"></i> <span>Settings</span>
+                </button>
+                <button class="menu-item" id="menu-help">
+                  <i data-lucide="help-circle"></i> <span>Help</span>
+                </button>
+                <hr>
+                <button class="menu-item logout" id="logout-btn">
+                  <i data-lucide="log-out"></i> <span>Log out</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="search-container">
+          <div class="search-bar">
+            <i data-lucide="search"></i>
+            <input type="text" placeholder="Search or start new chat" id="chat-search">
+          </div>
+        </div>
+
+        <div class="chat-list" id="chat-list">
+          <!-- Chat items will be injected here -->
+        </div>
+      </aside>
+
+      <!-- Main Chat Area -->
+      <main class="chat-window" id="chat-window">
+        <!-- Welcome Screen (Default) -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="welcome-content">
+            <div class="welcome-logo">
+              <svg viewBox="0 0 100 100" class="nexus-logo large">
+                <path d="M20,30 L50,10 L80,30 L80,70 L50,90 L20,70 Z" fill="none" stroke="white" stroke-width="6" stroke-linejoin="round"/>
+                <path d="M35,40 L50,55 L65,40 M50,55 L50,85" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h1>Welcome to Nexus</h1>
+            <p>Select a chat to start messaging.</p>
+          </div>
+        </div>
+
+        <!-- Active Chat -->
+        <div class="active-chat hidden" id="active-chat">
+          <header class="chat-header">
+            <button class="icon-btn mobile-only" id="back-btn" title="Back to Chats">
+              <i data-lucide="arrow-left"></i>
+            </button>
+            <div class="chat-info" id="active-chat-info">
+              <!-- Injected by JS -->
+            </div>
+            <div class="chat-actions">
+              <button class="icon-btn" id="phone-btn" title="Audio Call"><i data-lucide="phone"></i></button>
+              <button class="icon-btn" id="video-btn" title="Video Call"><i data-lucide="video"></i></button>
+              <button class="icon-btn" id="msg-search-toggle" title="Search Messages"><i data-lucide="search"></i></button>
+              <button class="icon-btn" id="info-toggle" title="Contact Info"><i data-lucide="info"></i></button>
+            </div>
+          </header>
+
+          <div id="msg-search-bar" class="message-search-container hidden">
+            <div class="search-bar">
+              <i data-lucide="search"></i>
+              <input type="text" placeholder="Search in chat..." id="msg-search-input">
+              <button class="icon-btn" id="close-msg-search"><i data-lucide="x"></i></button>
+            </div>
+          </div>
+
+          <div class="messages-container" id="messages-container">
+            <!-- Messages injected here -->
+          </div>
+
+          <footer class="chat-footer">
+            <button class="icon-btn"><i data-lucide="smile"></i></button>
+            <button class="icon-btn"><i data-lucide="paperclip"></i></button>
+            <div class="message-input-wrapper">
+              <input type="text" placeholder="Type a message" id="message-input">
+            </div>
+            <button class="send-btn" id="send-btn">
+              <i data-lucide="send"></i>
+            </button>
+          </footer>
+        </div>
+      </main>
+
+      <!-- Profile Modal (New) -->
+      <div id="profile-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3>My Profile</h3>
+            <button class="icon-btn" id="close-profile"><i data-lucide="x"></i></button>
+          </header>
+          <div class="modal-content">
+            <div class="profile-upload">
+              <img src="/images/user1.png" alt="Profile" id="my-profile-img" class="avatar-large">
+              <button class="edit-avatar-btn" id="edit-avatar-btn"><i data-lucide="camera"></i></button>
+              <input type="file" id="avatar-input" class="hidden" accept="image/*">
+            </div>
+            <div class="input-group">
+              <label>Display Name</label>
+              <input type="text" id="my-name" value="Jeeva">
+            </div>
+            <div class="input-group">
+              <label>Unique Username</label>
+              <div class="username-input-wrapper">
+                <span>@</span>
+                <input type="text" id="my-username" placeholder="username">
+              </div>
+              <small id="username-hint" style="color: var(--text-muted); font-size: 0.7rem; display: block; margin-top: 4px;">Must be unique.</small>
+            </div>
+            <div class="input-group">
+              <label>Status</label>
+              <input type="text" id="my-status" value="Available">
+            </div>
+            <button class="save-btn" id="save-profile">Save Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Modal (New) -->
+      <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3>Settings</h3>
+            <button class="icon-btn" id="close-settings"><i data-lucide="x"></i></button>
+          </header>
+          <div class="modal-content">
+            <div class="setting-item">
+              <div class="setting-info">
+                <h4>Dark Mode</h4>
+                <p>Switch between light and dark themes.</p>
+              </div>
+              <button class="icon-btn" id="settings-theme-toggle"><i data-lucide="moon"></i></button>
+            </div>
+            <hr>
+            <div class="setting-item">
+              <div class="setting-info">
+                <h4>Privacy</h4>
+                <p>Manage who can see your status.</p>
+              </div>
+              <i data-lucide="chevron-right"></i>
+            </div>
+            <hr>
+            <div class="setting-item">
+              <div class="setting-info">
+                <h4>Account</h4>
+                <p>Download your data or delete account.</p>
+              </div>
+              <i data-lucide="chevron-right"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Help Modal (New) -->
+      <div id="help-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3>Help & Support</h3>
+            <button class="icon-btn" id="close-help"><i data-lucide="x"></i></button>
+          </header>
+          <div class="modal-content" style="text-align: left;">
+            <h4>Getting Started</h4>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">Nexus is a real-time communication platform. You can start private chats by clicking the + icon and searching for @usernames.</p>
+            <h4>FAQs</h4>
+            <ul style="font-size: 0.9rem; color: var(--text-secondary); padding-left: 20px;">
+              <li>Is my data safe? Yes, we use Firebase encryption.</li>
+              <li>How do I change my logo? This is a premium platform feature.</li>
+            </ul>
+            <button class="save-btn" style="margin-top: 30px;">Contact Support</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- New Chat Modal (New) -->
+      <div id="new-chat-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3>Start New Chat</h3>
+            <button class="icon-btn" id="close-new-chat"><i data-lucide="x"></i></button>
+          </header>
+          <div class="search-container">
+            <div class="search-bar">
+              <i data-lucide="search"></i>
+              <input type="text" placeholder="Search users..." id="user-search">
+            </div>
+          </div>
+          <div class="modal-content user-list" id="user-list">
+            <!-- Users injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Call Overlay (New) -->
+      <div id="call-overlay" class="modal-overlay hidden">
+        <div class="call-card">
+          <div class="video-container" id="video-container">
+            <video id="remote-video" autoplay playsinline class="remote-video"></video>
+            <video id="local-video" autoplay playsinline muted class="local-video"></video>
+          </div>
+          <div class="call-info-overlay" id="call-info-overlay">
+            <div class="call-avatar-wrapper">
+              <img src="/images/user2.png" alt="Calling" id="call-avatar" class="avatar-large">
+              <div class="pulse-ring"></div>
+            </div>
+            <h2 id="call-name">Alex Rivera</h2>
+            <p id="call-status">Ringing...</p>
+          </div>
+          <div class="call-actions">
+            <button class="call-btn secondary" id="toggle-mic"><i data-lucide="mic"></i></button>
+            <button class="call-btn end" id="end-call"><i data-lucide="phone-off"></i></button>
+            <button class="call-btn accept" id="accept-call"><i data-lucide="phone"></i></button>
+            <button class="call-btn secondary" id="toggle-video"><i data-lucide="video"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Panel (Collapsible) -->
+      <section class="info-panel hidden" id="info-panel">
+        <header class="info-header">
+          <h2>Contact Info</h2>
+          <button class="icon-btn" id="close-info"><i data-lucide="x"></i></button>
+        </header>
+        <div class="info-content" id="contact-details">
+          <!-- Injected by JS -->
+        </div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
