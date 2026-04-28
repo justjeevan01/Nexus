@@ -14,8 +14,10 @@ let remoteStream = null;
 let peerConnection = null;
 let callUnsubscribe = null;
 let activeMessages = [];
+let activeMessages = [];
 let isMuted = false;
 let isVideoOff = false;
+let currentCallUserId = null;
 
 const servers = {
   iceServers: [
@@ -284,6 +286,7 @@ async function startCall(type) {
   const chat = chats.find(c => c.id === activeChatId);
   if (chat.type === 'public') { alert("Public calls not supported."); return; }
   const otherUid = chat.participants.find(uid => uid !== currentUser.uid);
+  currentCallUserId = otherUid;
 
   callName.innerText = getPrivateChatName(chat);
   callAvatar.src = getPrivateChatAvatar(chat);
@@ -327,9 +330,13 @@ async function startCall(type) {
   await setDoc(callDoc, { offer });
 
   onSnapshot(callDoc, (snapshot) => {
+    if (!snapshot.exists()) {
+      endCall();
+      return;
+    }
     const data = snapshot.data();
-    if (!peerConnection.currentRemoteDescription && data?.answer) {
-      peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    if (peerConnection && !peerConnection.currentRemoteDescription && data?.answer) {
+      peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(console.error);
     }
   });
 
@@ -363,6 +370,7 @@ function showIncomingCall(data) {
 
 async function acceptCall(callerUid, callType) {
   callStatus.innerText = "Connecting...";
+  currentCallUserId = callerUid;
   peerConnection = new RTCPeerConnection(servers);
   remoteStream = new MediaStream();
   localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'Video', audio: true });
@@ -428,7 +436,10 @@ async function endCall() {
   ringingInfo.classList.remove('hidden');
   localVideo.classList.add('hidden');
   deleteDoc(doc(db, "calls", currentUser.uid)).catch(()=>{});
-  chats.forEach(chat => { if(chat.type === 'private') deleteDoc(doc(db, "calls", chat.id)).catch(()=>{}); });
+  if (currentCallUserId) {
+    deleteDoc(doc(db, "calls", currentCallUserId)).catch(()=>{});
+    currentCallUserId = null;
+  }
   isMuted = false; isVideoOff = false;
   toggleMicBtn.classList.remove('muted'); toggleVideoBtn.classList.remove('muted');
   toggleMicBtn.querySelector('i').setAttribute('data-lucide', 'mic');
