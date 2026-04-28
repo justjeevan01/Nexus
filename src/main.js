@@ -88,7 +88,7 @@ const videoBtn = document.getElementById('video-btn');
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
 const videoContainer = document.getElementById('video-container');
-const callInfoOverlay = document.getElementById('call-info-overlay');
+const ringingInfo = document.getElementById('ringing-info');
 const toggleMicBtn = document.getElementById('toggle-mic');
 const toggleVideoBtn = document.getElementById('toggle-video');
 
@@ -369,8 +369,9 @@ async function acceptCall(callerUid, callType) {
     event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
     remoteVideo.srcObject = remoteStream;
     remoteVideo.play().catch(e => console.error("Playback failed", e));
-    callStatus.innerText = "On Real Call";
-    callInfoOverlay.style.opacity = '0.2';
+    ringingInfo.style.opacity = '0';
+    setTimeout(() => ringingInfo.classList.add('hidden'), 400);
+    localVideo.classList.remove('hidden');
   };
   const callDoc = doc(db, "calls", currentUser.uid);
   const offerCandidates = collection(callDoc, "offerCandidates");
@@ -414,11 +415,16 @@ function toggleVideo() {
 }
 
 async function endCall() {
-  if (localStream) localStream.getTracks().forEach(t => t.stop());
-  if (peerConnection) peerConnection.close();
-  peerConnection = null; localStream = null; remoteStream = null;
-  videoContainer.style.display = 'none'; callOverlay.classList.add('hidden');
-  if (currentUser) await deleteDoc(doc(db, "calls", currentUser.uid));
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  callOverlay.classList.add('hidden');
+  videoContainer.style.display = 'none';
+  acceptCallBtn.classList.add('hidden');
+  ringingInfo.style.opacity = '1';
+  ringingInfo.classList.remove('hidden');
+  localVideo.classList.add('hidden');
+  deleteDoc(doc(db, "calls", currentUser.uid)).catch(()=>{});
+  chats.forEach(chat => { if(chat.type === 'private') deleteDoc(doc(db, "calls", chat.id)).catch(()=>{}); });
   isMuted = false; isVideoOff = false;
   toggleMicBtn.classList.remove('muted'); toggleVideoBtn.classList.remove('muted');
   toggleMicBtn.querySelector('i').setAttribute('data-lucide', 'mic');

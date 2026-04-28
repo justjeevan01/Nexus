@@ -263,27 +263,27 @@
         </div>
       </div>
 
-      <!-- Call Overlay (New) -->
-      <div id="call-overlay" class="modal-overlay hidden">
-        <div class="call-card">
-          <div class="video-container" id="video-container">
-            <video id="remote-video" autoplay playsinline class="remote-video"></video>
-            <video id="local-video" autoplay playsinline muted class="local-video"></video>
+      <!-- Call Overlay (Premium UI) -->
+      <div id="call-overlay" class="call-overlay-premium hidden">
+        <div class="video-container" id="video-container">
+          <video id="remote-video" autoplay playsinline class="remote-video"></video>
+          <video id="local-video" autoplay playsinline muted class="local-video hidden"></video>
+        </div>
+        
+        <div class="ringing-info" id="ringing-info">
+          <div class="call-avatar-wrapper">
+            <img src="/images/user2.png" alt="Calling" id="call-avatar" class="avatar-large">
+            <div class="pulse-ring"></div>
           </div>
-          <div class="call-info-overlay" id="call-info-overlay">
-            <div class="call-avatar-wrapper">
-              <img src="/images/user2.png" alt="Calling" id="call-avatar" class="avatar-large">
-              <div class="pulse-ring"></div>
-            </div>
-            <h2 id="call-name">Alex Rivera</h2>
-            <p id="call-status">Ringing...</p>
-          </div>
-          <div class="call-actions">
-            <button class="call-btn secondary" id="toggle-mic"><i data-lucide="mic"></i></button>
-            <button class="call-btn end" id="end-call"><i data-lucide="phone-off"></i></button>
-            <button class="call-btn accept" id="accept-call"><i data-lucide="phone"></i></button>
-            <button class="call-btn secondary" id="toggle-video"><i data-lucide="video"></i></button>
-          </div>
+          <h2 id="call-name">Alex Rivera</h2>
+          <p id="call-status">Ringing...</p>
+        </div>
+
+        <div class="call-controls-bar" id="call-controls-bar">
+          <button class="call-btn secondary" id="toggle-mic" title="Toggle Mic"><i data-lucide="mic"></i></button>
+          <button class="call-btn end" id="end-call" title="End Call"><i data-lucide="phone-off"></i></button>
+          <button class="call-btn accept hidden" id="accept-call" title="Accept Call"><i data-lucide="phone"></i></button>
+          <button class="call-btn secondary" id="toggle-video" title="Toggle Video"><i data-lucide="video"></i></button>
         </div>
       </div>
 

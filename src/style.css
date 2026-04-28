@@ -574,19 +574,20 @@ h1, h2, h3 {
   font-size: 0.9rem;
 }
 
-/* Call Card */
-.call-card {
-  background: var(--bg-sidebar);
-  padding: 40px;
-  border-radius: 40px;
-  width: 90%;
-  max-width: 400px;
-  text-align: center;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-accent);
-  position: relative;
+/* Premium Full Screen Call UI */
+.call-overlay-premium {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-main);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   overflow: hidden;
-  animation: modalIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: modalIn 0.3s ease-out;
 }
 
 .video-container {
@@ -608,27 +609,45 @@ h1, h2, h3 {
 
 .local-video {
   position: absolute;
-  bottom: 20px;
+  bottom: 120px;
   right: 20px;
-  width: 120px;
+  width: 110px;
   height: 160px;
-  background: #333;
-  border-radius: 12px;
+  background: #111;
+  border-radius: 16px;
   object-fit: cover;
-  border: 2px solid white;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow);
   z-index: 10;
+  transition: opacity 0.3s ease;
 }
 
-.call-info-overlay {
-  position: relative;
+.ringing-info {
+  position: absolute;
   z-index: 5;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.4s ease;
+}
+
+.ringing-info h2 {
+  font-size: 2rem;
+  margin-top: 10px;
+}
+
+.ringing-info p {
+  color: var(--accent);
+  margin-top: 8px;
+  font-size: 1.1rem;
 }
 
 .call-avatar-wrapper {
   position: relative;
   width: 150px;
   height: 150px;
-  margin: 0 auto 30px;
+  margin-bottom: 20px;
 }
 
 .pulse-ring {
@@ -637,20 +656,28 @@ h1, h2, h3 {
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: 40px;
+  border-radius: 50%;
   background: var(--accent);
   opacity: 0.3;
   animation: pulse 2s infinite;
   z-index: -1;
 }
 
-.call-actions {
+.call-controls-bar {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   justify-content: center;
-  gap: 40px;
-  margin-top: 40px;
-  position: relative;
-  z-index: 5;
+  gap: 24px;
+  padding: 16px 32px;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 40px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 20;
 }
 
 .call-btn {
