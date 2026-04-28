@@ -55,7 +55,8 @@ body {
     radial-gradient(at 0% 0%, hsla(160, 60%, 45%, 0.1) 0, transparent 50%),
     radial-gradient(at 100% 100%, hsla(225, 60%, 45%, 0.1) 0, transparent 50%);
   color: var(--text-primary);
-  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh; /* fallback */
   overflow: hidden;
 }
 
@@ -1030,6 +1031,10 @@ h1, h2, h3 {
   }
   .info-panel { display: none; }
   .layout { border-radius: 0; }
-  #app { padding: 0; }
+  #app { padding: 0; height: 100%; width: 100%; }
   .mobile-only { display: flex; }
+  .chat-footer { padding: 12px; gap: 8px; }
+  .message-input-wrapper { padding: 10px 14px; }
+  .icon-btn { padding: 6px; }
+  .send-btn { width: 42px; height: 42px; border-radius: 12px; }
 }
