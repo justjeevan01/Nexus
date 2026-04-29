@@ -581,6 +581,14 @@ img.emoji {
   vertical-align: -0.1em;
 }
 
+.status-icon.read {
+  stroke: #34B7F1 !important;
+}
+
+.status-icon.delivered {
+  stroke: var(--text-muted);
+}
+
 .message.self {
   align-self: flex-end;
   background: var(--bg-bubble-self);

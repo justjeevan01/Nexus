@@ -451,6 +451,7 @@ function refreshMessages() {
   const msgQuery = query(collection(db, "chats", activeChatId, "messages"), orderBy("timestamp", "asc"));
   messageListener = onSnapshot(msgQuery, (snapshot) => { 
     activeMessages = snapshot.docs.map(doc => doc.data()); 
+    const currentChat = chats.find(c => c.id === activeChatId);
     renderMessages(activeMessages, msgSearchInput.value); 
     
     // Real-time mark as read
@@ -564,13 +565,14 @@ function cancelReply() {
 async function sendMessage() {
   const text = messageInput.value.trim(); if (!text && !replyingToMessage) return;
   if (!text || !activeChatId) return;
-  const chatRef = doc(db, "chats", activeChatId); const msgRef = collection(chatRef, "messages"); messageInput.value = '';
+  const chatRef = doc(db, "chats", activeChatId); const msgRef = doc(collection(chatRef, "messages"));
+  const msgId = msgRef.id;
+  messageInput.value = '';
   
-  const msgData = { text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp(), readBy: [currentUser.uid] };
+  const msgData = { id: msgId, text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp(), readBy: [currentUser.uid] };
   if (replyingToMessage) { msgData.replyTo = replyingToMessage; cancelReply(); }
   
-  const docRef = await addDoc(msgRef, msgData);
-  await updateDoc(doc(db, "chats", activeChatId, "messages", docRef.id), { id: docRef.id });
+  await setDoc(msgRef, msgData);
 
   const chat = chats.find(c => c.id === activeChatId);
   const updates = { lastMessage: text, lastMessageTime: serverTimestamp(), lastMessageSenderId: currentUser.uid };
