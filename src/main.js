@@ -1423,20 +1423,28 @@ function setupEventListeners() {
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
 
-  chatsTab.onclick = (e) => {
+  window.handleTabClick = (tab) => {
+    currentSidebarTab = tab;
+    const cTab = document.getElementById('chats-tab');
+    const rTab = document.getElementById('requests-tab');
+    if (tab === 'chats') {
+      cTab.classList.add('active');
+      rTab.classList.remove('active');
+    } else {
+      rTab.classList.add('active');
+      cTab.classList.remove('active');
+    }
+    renderChatList();
+  };
+
+  document.getElementById('chats-tab').onclick = (e) => {
     e.preventDefault();
-    currentSidebarTab = 'chats'; 
-    chatsTab.classList.add('active'); 
-    requestsTab.classList.remove('active'); 
-    renderChatList(); 
+    window.handleTabClick('chats');
   };
   
-  requestsTab.onclick = (e) => {
+  document.getElementById('requests-tab').onclick = (e) => {
     e.preventDefault();
-    currentSidebarTab = 'requests'; 
-    requestsTab.classList.add('active'); 
-    chatsTab.classList.remove('active'); 
-    renderChatList(); 
+    window.handleTabClick('requests');
   };
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);

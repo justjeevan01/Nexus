@@ -244,6 +244,8 @@ h1, h2, h3 {
   cursor: pointer;
   position: relative;
   transition: var(--transition-fast);
+  pointer-events: auto !important;
+  z-index: 21 !important;
 }
 
 .tab-btn.active {
