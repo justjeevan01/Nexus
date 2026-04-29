@@ -113,11 +113,17 @@ const toggleMicBtn = document.getElementById('toggle-mic');
 const toggleVideoBtn = document.getElementById('toggle-video');
 const shareScreenBtn = document.getElementById('share-screen-btn');
 const createGroupModal = document.getElementById('create-group-modal');
-const closeCreateGroup = document.getElementById('close-create-group');
+const addMembersModal = document.getElementById('add-members-modal');
+const closeAddMembers = document.getElementById('close-add-members');
+const addMembersListEl = document.getElementById('add-members-list');
+const addMembersSearchInput = document.getElementById('add-members-search');
+const confirmAddMembersBtn = document.getElementById('confirm-add-members-btn');
+const openAddMembersBtn = document.getElementById('open-add-members-btn');
 const openCreateGroupBtn = document.getElementById('open-create-group-btn');
 const groupUserList = document.getElementById('group-user-list');
 const confirmCreateGroupBtn = document.getElementById('confirm-create-group-btn');
 const groupNameInput = document.getElementById('group-name-input');
+const closeCreateGroup = document.getElementById('close-create-group');
 
 // --- AUTH LOGIC ---
 
@@ -1031,9 +1037,13 @@ async function openGroupInfo(chat) {
   name.innerHTML = chat.name + (isUserAdmin ? ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>' : '');
   memberLabel.innerText = `Members (${chat.participants.length})`;
   
-  // Show edit button only for admin
-  if (isUserAdmin) editBtn.classList.remove('hidden');
-  else editBtn.classList.add('hidden');
+  if (isUserAdmin) {
+    editBtn.classList.remove('hidden');
+    openAddMembersBtn.classList.remove('hidden');
+  } else {
+    editBtn.classList.add('hidden');
+    openAddMembersBtn.classList.add('hidden');
+  }
 
   memberList.innerHTML = chat.participants.map((uid, idx) => `
     <div class="user-item" style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
@@ -1136,6 +1146,69 @@ async function leaveGroup() {
     welcomeScreen.classList.remove('hidden');
     activeChatId = null;
   }
+}
+
+async function showAddMembersList(filter = '') {
+  if (!activeChatId) return;
+  const chat = chats.find(c => c.id === activeChatId);
+  const snapshot = await getDocs(collection(db, "users"));
+  const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }))
+    .filter(u => u.uid !== currentUser.uid && !chat.participants.includes(u.uid));
+
+  const filtered = users.filter(u => u.name.toLowerCase().includes(filter.toLowerCase()) || u.username?.toLowerCase().includes(filter.toLowerCase()));
+
+  addMembersListEl.innerHTML = filtered.map(u => `
+    <div class="user-item">
+      <input type="checkbox" value="${u.uid}" data-name="${u.name}" data-username="${u.username || ''}" data-avatar="${u.avatar || '/images/user1.png'}" style="margin-right: 15px; width: 20px; height: 20px;">
+      <img src="${u.avatar || '/images/user1.png'}" alt="${u.name}" class="avatar">
+      <div class="user-item-info">
+        <h4>${u.name}</h4>
+        <p>@${u.username || 'user'}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addMembersToGroup() {
+  if (!activeChatId) return;
+  const selectedCbs = Array.from(addMembersListEl.querySelectorAll('input[type="checkbox"]:checked'));
+  if (selectedCbs.length === 0) return;
+
+  confirmAddMembersBtn.disabled = true;
+  confirmAddMembersBtn.innerText = "Adding...";
+
+  const newUids = selectedCbs.map(cb => cb.value);
+  const newNames = selectedCbs.map(cb => cb.dataset.name);
+  const newUsernames = selectedCbs.map(cb => cb.dataset.username);
+  const newAvatars = selectedCbs.map(cb => cb.dataset.avatar);
+
+  const chat = chats.find(c => c.id === activeChatId);
+  const updatedParticipants = [...chat.participants, ...newUids];
+  const updatedNames = [...chat.participantNames, ...newNames];
+  const updatedUsernames = [...chat.participantUsernames, ...newUsernames];
+  const updatedAvatars = [...chat.participantAvatars, ...newAvatars];
+
+  await updateDoc(doc(doc(db, "chats", activeChatId)), {
+    participants: updatedParticipants,
+    participantNames: updatedNames,
+    participantUsernames: updatedUsernames,
+    participantAvatars: updatedAvatars
+  });
+
+  const msgRef = collection(doc(db, "chats", activeChatId), "messages");
+  await addDoc(msgRef, {
+    text: `Admin added ${newNames.join(', ')}`,
+    senderId: 'system',
+    senderName: 'System',
+    timestamp: serverTimestamp()
+  });
+
+  addMembersModal.classList.add('hidden');
+  confirmAddMembersBtn.disabled = false;
+  confirmAddMembersBtn.innerText = "Add Selected";
+  
+  const latestChat = chats.find(c => c.id === activeChatId);
+  openGroupInfo(latestChat);
 }
 
 // --- UI HELPERS ---
@@ -1311,6 +1384,11 @@ function setupEventListeners() {
     document.getElementById('group-info-modal').classList.add('hidden');
   });
   document.getElementById('leave-group-btn')?.addEventListener('click', leaveGroup);
+
+  openAddMembersBtn.addEventListener('click', () => { addMembersModal.classList.remove('hidden'); addMembersSearchInput.value = ''; showAddMembersList(); });
+  closeAddMembers.addEventListener('click', () => addMembersModal.classList.add('hidden'));
+  addMembersSearchInput.addEventListener('input', (e) => showAddMembersList(e.target.value));
+  confirmAddMembersBtn.addEventListener('click', addMembersToGroup);
 
   // --- SWIPE TO REPLY LOGIC ---
   let startX = 0;
