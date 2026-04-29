@@ -491,21 +491,16 @@ h1, h2, h3 {
   color: var(--text-muted);
 }
 
-.messages-scroll-wrapper {
+.messages-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  background-image: radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 30px 30px;
-}
-
-.messages-container {
-  overflow: visible;
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 100%;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 30px 30px;
 }
 
 .message-search-container {
@@ -531,7 +526,6 @@ h1, h2, h3 {
   transition: transform 0.15s ease-out;
   touch-action: manipulation;
   cursor: grab;
-  overflow: visible;
   will-change: transform;
 }
 
@@ -677,7 +671,7 @@ img.emoji {
 }
 
 .swipe-indicator {
-  position: fixed; /* Set via JS - bypasses all overflow:hidden ancestors */
+  position: fixed; /* Bypasses overflow:hidden */
   width: 32px;
   height: 32px;
   background: var(--bg-sidebar);
@@ -696,7 +690,7 @@ img.emoji {
 
 .message.self .swipe-indicator,
 .message.other .swipe-indicator {
-  /* positions set by JS using getBoundingClientRect */
+  /* JS sets fixed positions */
 }
 
 .status-icon {
