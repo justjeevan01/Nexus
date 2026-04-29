@@ -147,6 +147,10 @@
           <div class="messages-container" id="messages-container">
             <!-- Messages injected here -->
           </div>
+          <div id="typing-indicator-box" class="typing-indicator-box hidden">
+            <span id="typing-text">User is typing...</span>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+          </div>
 
           <div id="request-banner" class="request-banner hidden">
             <p><strong><span id="request-user-name">User</span></strong> wants to message you.</p>
@@ -310,6 +314,17 @@
               <!-- Checkbox users injected here -->
             </div>
             <button class="save-btn" id="confirm-create-group-btn">Create Group</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Image Preview Modal (New) -->
+      <div id="image-preview-modal" class="modal-overlay image-preview-modal hidden">
+        <div class="preview-container">
+          <img id="preview-img" src="" alt="Preview">
+          <div class="preview-actions">
+            <button class="preview-btn cancel" id="cancel-preview-btn-modal">Cancel</button>
+            <button class="preview-btn send" id="confirm-send-img-btn">Send Image</button>
           </div>
         </div>
       </div>

@@ -227,7 +227,9 @@ function listenToUserStatuses() {
 
 function updateHeaderStatus(chat) {
   const statusEl = document.getElementById('header-status');
-  if (!statusEl) return;
+  const typingBox = document.getElementById('typing-indicator-box');
+  const typingText = document.getElementById('typing-text');
+  if (!statusEl || !typingBox) return;
   
   if (chat.type === 'private') {
     const otherUid = chat.participants.find(uid => uid !== currentUser.uid);
@@ -236,22 +238,35 @@ function updateHeaderStatus(chat) {
     
     if (isTyping) {
       statusEl.innerText = "typing...";
-      statusEl.className = "header-status";
-      document.getElementById('typing-indicator').classList.remove('hidden');
+      typingBox.classList.remove('hidden');
+      typingText.innerText = `${chat.participantNames?.find((n, i) => chat.participants[i] === otherUid) || 'Someone'} is typing...`;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     } else {
-      document.getElementById('typing-indicator').classList.add('hidden');
-      if (status?.isOnline) {
-        statusEl.innerText = "Online";
-        statusEl.className = "header-status";
-      } else {
-        statusEl.innerText = "Offline";
-        statusEl.className = "header-status offline";
-      }
+      typingBox.classList.add('hidden');
+      statusEl.innerText = status?.isOnline ? "Online" : "Offline";
     }
   } else {
-    statusEl.innerText = "Group Chat";
-    statusEl.className = "header-status offline";
-    document.getElementById('typing-indicator').classList.add('hidden');
+    // Group Status: Show members
+    const members = chat.participantNames || [];
+    const othersCount = members.length - 2;
+    const membersText = members.length > 2 
+      ? `${members[0]}, ${members[1]} and ${othersCount} others`
+      : members.join(', ');
+    statusEl.innerText = membersText;
+    
+    // Group Typing
+    const typingUids = Object.keys(chat.typing || {}).filter(uid => uid !== currentUser.uid && chat.typing[uid]);
+    if (typingUids.length > 0) {
+      typingBox.classList.remove('hidden');
+      const names = typingUids.map(uid => {
+        const idx = chat.participants.indexOf(uid);
+        return idx !== -1 ? chat.participantNames[idx] : 'Someone';
+      }).join(', ');
+      typingText.innerText = `${names} ${typingUids.length > 1 ? 'are' : 'is'} typing...`;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    } else {
+      typingBox.classList.add('hidden');
+    }
   }
 }
 
@@ -389,13 +404,36 @@ function switchChat(id) {
   welcomeScreen.classList.add('hidden'); activeChatScreen.classList.remove('hidden', 'active'); activeChatScreen.classList.add('active'); 
   document.querySelector('.chat-window').classList.add('active');
   activeChatInfo.innerHTML = `
-    <img src="${chatAvatar}" alt="${chatName}" class="avatar">
+    <div style="position: relative;">
+      <img src="${chatAvatar}" alt="${chatName}" class="avatar" id="active-chat-avatar">
+      ${chat.type === 'group' && chat.createdBy === currentUser.uid ? `<button id="edit-group-avatar" class="edit-group-btn"><i data-lucide="camera"></i></button>` : ''}
+    </div>
     <div class="chat-info-text">
       <h3>${chatName}</h3>
       <span id="header-status" class="header-status">Offline</span>
     </div>`;
+  lucide.createIcons();
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages();
   updateHeaderStatus(chat);
+
+  if (chat.type === 'group' && chat.createdBy === currentUser.uid) {
+    document.getElementById('edit-group-avatar')?.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const ext = file.name.split('.').pop();
+        const storageRef = ref(storage, `group_avatars/${id}.${ext}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        await updateDoc(doc(db, "chats", id), { avatar: url });
+        document.getElementById('active-chat-avatar').src = url;
+      };
+      input.click();
+    });
+  }
   
   if (chat.status === 'pending' && chat.initiator !== currentUser.uid) {
     requestBanner.classList.remove('hidden');
@@ -579,6 +617,31 @@ async function sendMessage() {
   chat.participants.forEach(p => { if (p !== currentUser.uid) updates[`unreadCounts.${p}`] = increment(1); });
   await updateDoc(chatRef, updates);
 }
+
+let pendingImageFile = null;
+
+function showImagePreview(file) {
+  pendingImageFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('preview-img').src = e.target.result;
+    document.getElementById('image-preview-modal').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('cancel-preview-btn-modal')?.addEventListener('click', () => {
+  document.getElementById('image-preview-modal').classList.add('hidden');
+  pendingImageFile = null;
+});
+
+document.getElementById('confirm-send-img-btn')?.addEventListener('click', () => {
+  if (pendingImageFile) {
+    uploadChatImage(pendingImageFile);
+    document.getElementById('image-preview-modal').classList.add('hidden');
+    pendingImageFile = null;
+  }
+});
 
 async function uploadChatImage(file) {
   if (!file || !activeChatId) return;
@@ -998,7 +1061,7 @@ function setupEventListeners() {
   });
   attachBtn.addEventListener('click', () => chatImageUpload.click());
   chatImageUpload.addEventListener('change', (e) => {
-    if (e.target.files[0]) uploadChatImage(e.target.files[0]);
+    if (e.target.files[0]) showImagePreview(e.target.files[0]);
     e.target.value = '';
   });
   emojiBtn.addEventListener('click', (e) => {
