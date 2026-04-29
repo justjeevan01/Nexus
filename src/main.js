@@ -246,13 +246,8 @@ function updateHeaderStatus(chat) {
       statusEl.innerText = status?.isOnline ? "Online" : "Offline";
     }
   } else {
-    // Group Status: Show members
-    const members = chat.participantNames || [];
-    const othersCount = members.length - 2;
-    const membersText = members.length > 2 
-      ? `${members[0]}, ${members[1]} and ${othersCount} others`
-      : members.join(', ');
-    statusEl.innerText = membersText;
+    // Group Status
+    statusEl.innerText = "Tap for group info";
     
     // Group Typing
     const typingUids = Object.keys(chat.typing || {}).filter(uid => uid !== currentUser.uid && chat.typing[uid]);
@@ -404,36 +399,17 @@ function switchChat(id) {
   welcomeScreen.classList.add('hidden'); activeChatScreen.classList.remove('hidden', 'active'); activeChatScreen.classList.add('active'); 
   document.querySelector('.chat-window').classList.add('active');
   activeChatInfo.innerHTML = `
-    <div style="position: relative;">
-      <img src="${chatAvatar}" alt="${chatName}" class="avatar" id="active-chat-avatar">
-      ${chat.type === 'group' && chat.createdBy === currentUser.uid ? `<button id="edit-group-avatar" class="edit-group-btn"><i data-lucide="camera"></i></button>` : ''}
-    </div>
+    <img src="${chatAvatar}" alt="${chatName}" class="avatar" id="active-chat-avatar">
     <div class="chat-info-text">
       <h3>${chatName}</h3>
       <span id="header-status" class="header-status">Offline</span>
     </div>`;
+  activeChatInfo.style.cursor = chat.type === 'group' ? 'pointer' : 'default';
+  activeChatInfo.onclick = chat.type === 'group' ? () => openGroupInfo(chat) : null;
+  
   lucide.createIcons();
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages();
   updateHeaderStatus(chat);
-
-  if (chat.type === 'group' && chat.createdBy === currentUser.uid) {
-    document.getElementById('edit-group-avatar')?.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const ext = file.name.split('.').pop();
-        const storageRef = ref(storage, `group_avatars/${id}.${ext}`);
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
-        await updateDoc(doc(db, "chats", id), { avatar: url });
-        document.getElementById('active-chat-avatar').src = url;
-      };
-      input.click();
-    });
-  }
   
   if (chat.status === 'pending' && chat.initiator !== currentUser.uid) {
     requestBanner.classList.remove('hidden');
@@ -1005,6 +981,75 @@ async function toggleScreenShare() {
   lucide.createIcons();
 }
 
+async function openGroupInfo(chat) {
+  const modal = document.getElementById('group-info-modal');
+  const img = document.getElementById('group-info-img');
+  const name = document.getElementById('group-info-name');
+  const memberList = document.getElementById('group-info-member-list');
+  const memberLabel = document.getElementById('member-count-label');
+  const editBtn = document.getElementById('edit-group-img-btn');
+
+  img.src = chat.avatar || '/images/group.png';
+  name.innerText = chat.name;
+  memberLabel.innerText = `Members (${chat.participants.length})`;
+  
+  // Show edit button only for admin
+  if (chat.createdBy === currentUser.uid) editBtn.classList.remove('hidden');
+  else editBtn.classList.add('hidden');
+
+  memberList.innerHTML = chat.participants.map((uid, idx) => `
+    <div class="user-item" style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
+      <div style="display: flex; align-items: center; flex: 1;">
+        <img src="${chat.participantAvatars[idx]}" style="width: 32px; height: 32px; border-radius: 50%;">
+        <div style="margin-left: 12px;">
+          <h4 style="font-size: 0.9rem;">${chat.participantNames[idx]} ${uid === chat.createdBy ? '<span style="color:var(--accent); font-size:0.6rem; border:1px solid var(--accent); padding:1px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>' : ''}</h4>
+          <p style="font-size: 0.7rem; color: var(--text-muted);">@${chat.participantUsernames[idx]}</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  modal.classList.remove('hidden');
+}
+
+async function leaveGroup() {
+  if (!activeChatId || !confirm("Are you sure you want to leave this group?")) return;
+  const chat = chats.find(c => c.id === activeChatId);
+  const idx = chat.participants.indexOf(currentUser.uid);
+  
+  if (idx !== -1) {
+    const participants = [...chat.participants];
+    const names = [...chat.participantNames];
+    const usernames = [...chat.participantUsernames];
+    const avatars = [...chat.participantAvatars];
+
+    participants.splice(idx, 1);
+    names.splice(idx, 1);
+    usernames.splice(idx, 1);
+    avatars.splice(idx, 1);
+
+    await updateDoc(doc(db, "chats", activeChatId), {
+      participants,
+      participantNames: names,
+      participantUsernames: usernames,
+      participantAvatars: avatars
+    });
+
+    const msgRef = collection(doc(db, "chats", activeChatId), "messages");
+    await addDoc(msgRef, {
+      text: `${currentUser.name} left the group`,
+      senderId: 'system',
+      senderName: 'System',
+      timestamp: serverTimestamp()
+    });
+
+    document.getElementById('group-info-modal').classList.add('hidden');
+    activeChatScreen.classList.add('hidden');
+    welcomeScreen.classList.remove('hidden');
+    activeChatId = null;
+  }
+}
+
 // --- UI HELPERS ---
 function applyTheme() {
   document.body.classList.toggle('light-theme', !isDarkTheme);
@@ -1160,6 +1205,26 @@ function setupEventListeners() {
   requestsTab.addEventListener('click', () => { currentSidebarTab = 'requests'; requestsTab.classList.add('active'); chatsTab.classList.remove('active'); renderChatList(); });
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);
+
+  document.getElementById('close-group-info')?.addEventListener('click', () => document.getElementById('group-info-modal').classList.add('hidden'));
+  document.getElementById('leave-group-btn')?.addEventListener('click', leaveGroup);
+  document.getElementById('edit-group-img-btn')?.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file || !activeChatId) return;
+      const ext = file.name.split('.').pop();
+      const storageRef = ref(storage, `group_avatars/${activeChatId}.${ext}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, "chats", activeChatId), { avatar: url });
+      document.getElementById('group-info-img').src = url;
+      document.getElementById('active-chat-avatar').src = url;
+    };
+    input.click();
+  });
 
   // --- SWIPE TO REPLY LOGIC ---
   let startX = 0;

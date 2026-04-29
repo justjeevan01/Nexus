@@ -318,13 +318,37 @@
         </div>
       </div>
 
-      <!-- Image Preview Modal (New) -->
+      <!-- Image Preview Modal -->
       <div id="image-preview-modal" class="modal-overlay image-preview-modal hidden">
         <div class="preview-container">
           <img id="preview-img" src="" alt="Preview">
           <div class="preview-actions">
             <button class="preview-btn cancel" id="cancel-preview-btn-modal">Cancel</button>
             <button class="preview-btn send" id="confirm-send-img-btn">Send Image</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Group Info Modal (New) -->
+      <div id="group-info-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3>Group Info</h3>
+            <button class="icon-btn" id="close-group-info"><i data-lucide="x"></i></button>
+          </header>
+          <div class="modal-content">
+            <div class="profile-upload">
+              <img src="/images/group.png" alt="Group" id="group-info-img" class="avatar-large">
+              <button class="edit-avatar-btn hidden" id="edit-group-img-btn"><i data-lucide="camera"></i></button>
+            </div>
+            <h2 id="group-info-name" style="text-align: center; margin: 10px 0 20px;">Group Name</h2>
+            <div class="input-group">
+              <label id="member-count-label">Members (0)</label>
+              <div class="user-list" id="group-info-member-list" style="max-height: 250px; border: 1px solid var(--border); border-radius: 12px; margin-top: 10px;">
+                <!-- Members injected here -->
+              </div>
+            </div>
+            <button class="save-btn" id="leave-group-btn" style="background: hsl(0, 70%, 50%); margin-top: 20px;">Leave Group</button>
           </div>
         </div>
       </div>
