@@ -347,6 +347,17 @@ function renderChatList(filter = '') {
     requestCountBadge.classList.add('hidden');
   }
 
+  if (filtered.length === 0) {
+    chatListEl.innerHTML = `
+      <div style="padding: 40px 20px; text-align: center; color: var(--text-muted);">
+        <i data-lucide="${currentSidebarTab === 'requests' ? 'user-plus' : 'message-square'}" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+        <p>${currentSidebarTab === 'requests' ? 'No pending requests' : 'No chats yet'}</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
   chatListEl.innerHTML = filtered.map(chat => {
     const isActive = chat.id === activeChatId;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
@@ -1201,8 +1212,20 @@ function setupEventListeners() {
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
 
-  chatsTab.addEventListener('click', () => { currentSidebarTab = 'chats'; chatsTab.classList.add('active'); requestsTab.classList.remove('active'); renderChatList(); });
-  requestsTab.addEventListener('click', () => { currentSidebarTab = 'requests'; requestsTab.classList.add('active'); chatsTab.classList.remove('active'); renderChatList(); });
+  chatsTab.addEventListener('click', () => { 
+    console.log("Switching to Chats tab");
+    currentSidebarTab = 'chats'; 
+    chatsTab.classList.add('active'); 
+    requestsTab.classList.remove('active'); 
+    renderChatList(); 
+  });
+  requestsTab.addEventListener('click', () => { 
+    console.log("Switching to Requests tab");
+    currentSidebarTab = 'requests'; 
+    requestsTab.classList.add('active'); 
+    chatsTab.classList.remove('active'); 
+    renderChatList(); 
+  });
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);
 
