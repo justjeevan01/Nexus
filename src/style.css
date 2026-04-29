@@ -494,8 +494,9 @@ h1, h2, h3 {
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
   padding: 24px;
+  padding-left: 60px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -674,12 +675,12 @@ img.emoji {
 .swipe-indicator {
   position: absolute;
   top: 50%;
-  left: -45px;
+  left: -50px;
   transform: translateY(-50%) scale(0.5);
   width: 32px;
   height: 32px;
   background: var(--bg-sidebar);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--accent);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -691,14 +692,9 @@ img.emoji {
   z-index: 10;
 }
 
-/* WhatsApp style: indicator always on left (appears as you swipe right) */
-.message.self .swipe-indicator {
-  left: -45px;
-  right: auto;
-}
-
+.message.self .swipe-indicator,
 .message.other .swipe-indicator {
-  left: -45px;
+  left: -50px;
   right: auto;
 }
 

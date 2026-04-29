@@ -1532,10 +1532,16 @@ function setupEventListeners() {
 
   messagesContainer.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    e.preventDefault(); // Prevent text selection from interfering with swipe
     handleStart(e.clientX, e.target, e);
   });
 
-  window.addEventListener('mousemove', (e) => { if (isSwiping) handleMove(e.clientX, e); });
+  // Prevent text selection during swipe
+  messagesContainer.addEventListener('selectstart', (e) => {
+    if (isSwiping) e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => { if (isSwiping) { e.preventDefault(); handleMove(e.clientX, e); } });
   window.addEventListener('mouseup', (e) => { if (isSwiping) handleEnd(e.clientX); });
 }
 
