@@ -117,6 +117,7 @@ const welcomeScreen = document.getElementById('welcome-screen');
 const activeChatScreen = document.getElementById('active-chat');
 const activeChatInfo = document.getElementById('active-chat-info');
 const messagesContainer = document.getElementById('messages-container');
+const messagesScrollWrapper = document.getElementById('messages-scroll-wrapper');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const attachBtn = document.getElementById('attach-btn');
@@ -317,7 +318,7 @@ function updateHeaderStatus(chat) {
       statusEl.innerText = "typing...";
       typingBox.classList.remove('hidden');
       typingText.innerText = `${chat.participantNames?.find((n, i) => chat.participants[i] === otherUid) || 'Someone'} is typing...`;
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
     } else {
       typingBox.classList.add('hidden');
       statusEl.innerText = status?.isOnline ? "Online" : "Offline";
@@ -335,7 +336,7 @@ function updateHeaderStatus(chat) {
         return idx !== -1 ? chat.participantNames[idx] : 'Someone';
       }).join(', ');
       typingText.innerText = `${names} ${typingUids.length > 1 ? 'are' : 'is'} typing...`;
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
     } else {
       typingBox.classList.add('hidden');
     }
@@ -654,7 +655,7 @@ function renderMessages(messages, filter = '') {
   lastRenderedChatId = messageStateKey;
   
   if (window.twemoji) twemoji.parse(messagesContainer);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
   lucide.createIcons();
 }
 

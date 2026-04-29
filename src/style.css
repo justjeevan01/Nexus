@@ -491,17 +491,22 @@ h1, h2, h3 {
   color: var(--text-muted);
 }
 
-.messages-container {
+.messages-scroll-wrapper {
   flex: 1;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.messages-container {
+  overflow: visible;
   padding: 24px;
   padding-left: 60px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background-image: radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 30px 30px;
+  min-height: 100%;
 }
 
 .message-search-container {
