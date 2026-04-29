@@ -1,7 +1,7 @@
 import './style.css';
 import { auth, googleProvider, db, storage } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove, writeBatch } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- STATE ---
@@ -221,8 +221,14 @@ function renderChatList(filter = '') {
   document.querySelectorAll('.chat-item').forEach(item => item.addEventListener('click', () => switchChat(item.dataset.id)));
 }
 
-function getPrivateChatName(chat) { return chat.participantNames?.find(name => name !== currentUser.name) || "Direct Chat"; }
-function getPrivateChatAvatar(chat) { return chat.participantAvatars?.find(avatar => avatar !== currentUser.avatar) || "/images/user1.png"; }
+function getPrivateChatName(chat) { 
+  const index = chat.participants.findIndex(uid => uid !== currentUser.uid);
+  return index !== -1 && chat.participantNames ? chat.participantNames[index] : "Direct Chat";
+}
+function getPrivateChatAvatar(chat) { 
+  const index = chat.participants.findIndex(uid => uid !== currentUser.uid);
+  return index !== -1 && chat.participantAvatars ? chat.participantAvatars[index] : "/images/user1.png";
+}
 
 let messageListener = null;
 function switchChat(id) {
@@ -723,7 +729,32 @@ function setupEventListeners() {
     saveProfileBtn.disabled = true; const unique = await isUsernameUnique(newUsername, currentUser.uid);
     if (!unique) { alert("Username taken!"); saveProfileBtn.disabled = false; return; }
     currentUser.name = newName; currentUser.username = newUsername; currentUser.status = myStatusInput.value;
+    
+    // Save to users collection
     await setDoc(doc(db, "users", currentUser.uid), currentUser, { merge: true });
+    
+    // Sync profile changes to all chats the user is in
+    try {
+      const chatsQuery = query(collection(db, "chats"), where("participants", "array-contains", currentUser.uid));
+      const chatsSnap = await getDocs(chatsQuery);
+      const batch = writeBatch(db);
+      chatsSnap.forEach(chatDoc => {
+        const chatData = chatDoc.data();
+        const pIndex = chatData.participants.indexOf(currentUser.uid);
+        if (pIndex !== -1) {
+          if (chatData.participantNames) chatData.participantNames[pIndex] = newName;
+          if (chatData.participantUsernames) chatData.participantUsernames[pIndex] = newUsername;
+          if (chatData.participantAvatars) chatData.participantAvatars[pIndex] = currentUser.avatar;
+          batch.update(chatDoc.ref, { 
+            participantNames: chatData.participantNames,
+            participantUsernames: chatData.participantUsernames,
+            participantAvatars: chatData.participantAvatars
+          });
+        }
+      });
+      await batch.commit();
+    } catch(e) { console.error("Failed to sync profile to chats", e); }
+
     updateProfileUI(); profileModal.classList.add('hidden'); saveProfileBtn.disabled = false;
   });
   newChatBtn.addEventListener('click', () => { newChatModal.classList.remove('hidden'); showUserList(); });
