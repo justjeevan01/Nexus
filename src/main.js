@@ -367,11 +367,13 @@ function updateHeaderStatus(chat) {
 
 function showApp() { 
   console.log("Switching to App Screen");
+  document.getElementById('initial-loader')?.classList.add('hidden');
   authScreen.classList.add('hidden'); 
   appEl.classList.remove('hidden'); 
 }
 
 function showAuth() { 
+  document.getElementById('initial-loader')?.classList.add('hidden');
   authScreen.classList.remove('hidden'); 
   appEl.classList.add('hidden'); 
 }

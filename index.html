@@ -14,7 +14,11 @@
   <script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 </head>
 <body class="dark-theme">
-  <div id="auth-screen" class="auth-overlay">
+  <div id="initial-loader" class="initial-loader">
+    <div class="spinner"></div>
+  </div>
+
+  <div id="auth-screen" class="auth-overlay hidden">
     <div class="auth-card">
       <div class="auth-logo">
         <svg viewBox="0 0 100 100" class="nexus-logo">
