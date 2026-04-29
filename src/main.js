@@ -1,7 +1,7 @@
 import './style.css';
 import { auth, googleProvider, db, storage } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- STATE ---
@@ -111,10 +111,19 @@ onAuthStateChanged(auth, async (user) => {
 
       currentUser = {
         uid: user.uid, name: userData?.name || user.displayName, username: userData?.username || '',
-        email: user.email, avatar: userData?.avatar || user.photoURL, status: userData?.status || 'Available', theme: userData?.theme || 'dark'
+        email: user.email, avatar: userData?.avatar || user.photoURL, status: userData?.status || 'Available', theme: userData?.theme || 'dark',
+        followers: userData?.followers || [], following: userData?.following || []
       };
 
       if (!userDoc.exists()) await setDoc(userDocRef, currentUser);
+
+      onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          currentUser.followers = data.followers || [];
+          currentUser.following = data.following || [];
+        }
+      });
 
       isDarkTheme = currentUser.theme === 'dark'; applyTheme(); showApp(); loadChats(); updateProfileUI(); ensureGlobalChannel(); listenForCalls();
       if (!currentUser.username) {
@@ -264,11 +273,61 @@ async function showUserList(filter = '') {
   userListEl.innerHTML = '<div style="padding: 20px; text-align: center;"><i data-lucide="loader" class="animate-spin"></i></div>'; lucide.createIcons();
   const snapshot = await getDocs(collection(db, "users"));
   const users = snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== currentUser.uid && (u.name?.toLowerCase().includes(filter.toLowerCase()) || (u.username && u.username.toLowerCase().includes(filter.toLowerCase()))));
-  userListEl.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted);">No users found.</p>' : users.map(user => `<div class="user-item" data-uid="${user.uid}" data-name="${user.name}" data-avatar="${user.avatar}" data-username="${user.username}"><img src="${user.avatar}" alt="${user.name}"><div><h4>${user.name}</h4><p>@${user.username || 'unknown'} • ${user.status || 'Available'}</p></div></div>`).join('');
-  document.querySelectorAll('.user-item').forEach(item => item.addEventListener('click', () => startPrivateChat(item.dataset.uid, item.dataset.name, item.dataset.avatar, item.dataset.username)));
+  
+  userListEl.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted);">No users found.</p>' : users.map(user => {
+    const isFollowing = currentUser.following?.includes(user.uid);
+    const isFollower = currentUser.followers?.includes(user.uid);
+    
+    let btnText = "Follow";
+    let btnClass = "follow-btn";
+    if (isFollowing) {
+      btnText = "Following";
+      btnClass = "follow-btn following";
+    } else if (isFollower) {
+      btnText = "Follow Back";
+    }
+
+    return `
+      <div class="user-item">
+        <div class="user-item-info" data-uid="${user.uid}" data-name="${user.name}" data-avatar="${user.avatar}" data-username="${user.username}" style="display: flex; align-items: center; flex: 1; cursor: pointer;">
+          <img src="${user.avatar}" alt="${user.name}">
+          <div><h4>${user.name}</h4><p>@${user.username || 'unknown'}</p></div>
+        </div>
+        <button class="${btnClass}" onclick="window.toggleFollow('${user.uid}')">${btnText}</button>
+      </div>
+    `;
+  }).join('');
+  
+  document.querySelectorAll('.user-item-info').forEach(item => item.addEventListener('click', () => startPrivateChat(item.dataset.uid, item.dataset.name, item.dataset.avatar, item.dataset.username)));
 }
 
+window.toggleFollow = async function(targetUid) {
+  if (!currentUser) return;
+  const isFollowing = currentUser.following?.includes(targetUid);
+  try {
+    if (isFollowing) {
+      await updateDoc(doc(db, "users", currentUser.uid), { following: arrayRemove(targetUid) });
+      await updateDoc(doc(db, "users", targetUid), { followers: arrayRemove(currentUser.uid) });
+      currentUser.following = currentUser.following.filter(id => id !== targetUid);
+    } else {
+      await updateDoc(doc(db, "users", currentUser.uid), { following: arrayUnion(targetUid) });
+      await updateDoc(doc(db, "users", targetUid), { followers: arrayUnion(currentUser.uid) });
+      if (!currentUser.following) currentUser.following = [];
+      currentUser.following.push(targetUid);
+    }
+    showUserList(userSearchInput.value);
+  } catch (error) {
+    console.error("Failed to toggle follow", error);
+    alert("Could not update follow status.");
+  }
+};
+
 async function startPrivateChat(otherUid, otherName, otherAvatar, otherUsername) {
+  const isMutual = currentUser.following?.includes(otherUid) && currentUser.followers?.includes(otherUid);
+  if (!isMutual) {
+    alert(`You and ${otherName} must be following each other to chat or call.`);
+    return;
+  }
   newChatModal.classList.add('hidden'); const chatId = [currentUser.uid, otherUid].sort().join('_'); const chatRef = doc(db, "chats", chatId); const chatSnap = await getDoc(chatRef);
   if (!chatSnap.exists()) { await setDoc(chatRef, { type: 'private', participants: [currentUser.uid, otherUid], participantNames: [currentUser.name, otherName], participantUsernames: [currentUser.username, otherUsername], participantAvatars: [currentUser.avatar, otherAvatar], lastMessage: "Start of your private conversation", lastMessageTime: serverTimestamp() }); }
   switchChat(chatId);

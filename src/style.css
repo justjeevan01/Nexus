@@ -434,13 +434,11 @@ h1, h2, h3 {
 @keyframes messageSlide {
   from { 
     opacity: 0; 
-    transform: translateY(20px) scale(0.95); 
-    filter: blur(4px);
+    transform: translateY(15px);
   }
   to { 
     opacity: 1; 
-    transform: translateY(0) scale(1);
-    filter: blur(0);
+    transform: translateY(0);
   }
 }
 
@@ -976,9 +974,8 @@ h1, h2, h3 {
 .user-item {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
   padding: 12px 24px;
-  cursor: pointer;
   transition: var(--transition-fast);
 }
 
@@ -986,20 +983,47 @@ h1, h2, h3 {
   background: var(--border);
 }
 
-.user-item img {
+.user-item-info img {
   width: 44px;
   height: 44px;
   border-radius: 12px;
+  margin-right: 12px;
 }
 
-.user-item h4 {
+.user-item-info h4 {
   font-size: 0.95rem;
   font-weight: 600;
 }
 
-.user-item p {
+.user-item-info p {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.follow-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.follow-btn:hover {
+  background: var(--accent-hover);
+}
+
+.follow-btn.following {
+  background: var(--bg-chat);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.follow-btn.following:hover {
+  background: var(--border);
 }
 
 .setting-item {
