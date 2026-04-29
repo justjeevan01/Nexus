@@ -924,6 +924,7 @@ img.emoji {
   box-shadow: var(--shadow);
   z-index: 10;
   transition: opacity 0.3s ease;
+  transform: scaleX(-1);
 }
 
 .ringing-info {
