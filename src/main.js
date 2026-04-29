@@ -23,6 +23,8 @@ let currentSidebarTab = 'chats'; // 'chats' or 'requests'
 let userStatuses = {}; // Map of uid -> { isOnline: boolean, name: string, etc }
 let typingTimeout = null;
 let lastProcessedTimes = {};
+let lastRenderedChatId = null;
+let lastRenderedMessageCount = 0;
 
 const servers = {
   iceServers: [
@@ -461,8 +463,17 @@ function renderMessages(messages, filter = '') {
   const filtered = messages.filter(m => (m.text || '').toLowerCase().includes(filter.toLowerCase()));
   const currentChat = chats.find(c => c.id === activeChatId);
   
+  // Skip re-render if nothing significant changed (except read status)
+  const messageStateKey = `${activeChatId}-${filtered.length}-${filter}`;
+  const isSameState = lastRenderedChatId === messageStateKey;
+  
+  if (isSameState) {
+    updateReadReceipts(filtered, currentChat);
+    return;
+  }
+
   let lastDate = null;
-  messagesContainer.innerHTML = filtered.map(msg => {
+  const html = filtered.map(msg => {
     let dateDivider = '';
     if (msg.timestamp) {
       const currentDateStr = msg.timestamp.toDate().toDateString();
@@ -477,7 +488,7 @@ function renderMessages(messages, filter = '') {
     
     return dateDivider + `
       <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
-        <div class="swipe-indicator"><i data-lucide="reply" style="width:16px;height:16px;"></i></div>
+        <div class="swipe-indicator"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></div>
         ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
         ${msg.replyTo ? `
           <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
@@ -489,17 +500,37 @@ function renderMessages(messages, filter = '') {
         ${msg.text ? `<p>${msg.text}</p>` : ''}
         <div class="message-time">
           ${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}
-          ${isSelf ? `<i data-lucide="check-check" class="status-icon ${isRead ? 'read' : 'delivered'}"></i>` : ''}
+          ${isSelf ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${isRead ? '#34B7F1' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="status-icon ${isRead ? 'read' : 'delivered'}"><polyline points="20 6 9 17 4 12"></polyline><polyline points="14 6 7 13 4 10"></polyline></svg>` : ''}
         </div>
         <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
-          <i data-lucide="reply" style="width:14px;height:14px;"></i>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
         </div>
       </div>
     `;
   }).join(''); 
-  lucide.createIcons(); 
+
+  messagesContainer.innerHTML = html;
+  lastRenderedChatId = messageStateKey;
+  
   if (window.twemoji) twemoji.parse(messagesContainer);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  lucide.createIcons();
+}
+
+function updateReadReceipts(messages, chat) {
+  messages.forEach(msg => {
+    if (msg.senderId === currentUser.uid) {
+      const el = document.getElementById(`msg-${msg.id}`);
+      if (el) {
+        const icon = el.querySelector('.status-icon');
+        if (icon) {
+          const isRead = chat?.participants.every(p => msg.readBy?.includes(p));
+          icon.style.stroke = isRead ? '#34B7F1' : 'currentColor';
+          icon.classList.toggle('read', isRead);
+        }
+      }
+    }
+  });
 }
 
 window.setReply = function(id, name, text) {

@@ -559,6 +559,21 @@ h1, h2, h3 {
   }
 }
 
+.message:last-child {
+  animation: messageSlide 0.3s ease-out;
+}
+
+.message-image {
+  max-width: 100%;
+  border-radius: 12px;
+  margin-top: 8px;
+  cursor: pointer;
+  display: block;
+  aspect-ratio: auto;
+  min-height: 100px;
+  background: var(--border);
+}
+
 img.emoji {
   height: 1.2em;
   width: 1.2em;
