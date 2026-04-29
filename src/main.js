@@ -402,7 +402,8 @@ function loadChats() {
 
     chats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(chat => chat.type === 'public' || (chat.participants && chat.participants.includes(currentUser.uid)));
-    renderChatList(chatSearch.value); if (activeChatId) refreshMessages();
+    renderChatList(chatSearch.value); 
+    if (activeChatId) renderMessages(activeMessages, msgSearchInput.value);
   });
 }
 
@@ -699,7 +700,6 @@ function renderMessages(messages, filter = '') {
   
   if (window.twemoji) twemoji.parse(messagesContainer);
   messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
-  lucide.createIcons();
 }
 
 function updateReadReceipts(messages, chat) {

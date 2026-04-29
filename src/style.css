@@ -530,7 +530,6 @@ h1, h2, h3 {
   position: relative;
   font-size: 0.95rem;
   line-height: 1.5;
-  animation: messageSlide 0.3s ease-out;
   transition: transform 0.15s ease-out;
   touch-action: pan-y;
   cursor: grab;
