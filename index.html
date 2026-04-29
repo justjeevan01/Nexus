@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
+  <script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 </head>
 <body class="dark-theme">
   <div id="auth-screen" class="auth-overlay">
@@ -145,7 +146,14 @@
             <button class="icon-btn" id="emoji-btn"><i data-lucide="smile"></i></button>
             <button class="icon-btn" id="attach-btn"><i data-lucide="paperclip"></i></button>
             <input type="file" id="chat-image-upload" accept="image/*" class="hidden">
-            <div class="message-input-wrapper">
+            <div class="message-input-wrapper" style="flex-direction: column; position: relative;">
+              <div id="reply-preview" class="reply-preview hidden">
+                <div class="reply-preview-content">
+                  <span id="reply-preview-name">Name</span>
+                  <p id="reply-preview-text">Message</p>
+                </div>
+                <button class="icon-btn" id="cancel-reply-btn" style="color: var(--text-muted);"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+              </div>
               <input type="text" placeholder="Type a message" id="message-input">
             </div>
             <button class="send-btn" id="send-btn">
@@ -244,13 +252,18 @@
         </div>
       </div>
 
-      <!-- New Chat Modal (New) -->
+      <!-- New Chat Modal -->
       <div id="new-chat-modal" class="modal-overlay hidden">
         <div class="modal-card">
           <header class="modal-header">
             <h3>Start New Chat</h3>
             <button class="icon-btn" id="close-new-chat"><i data-lucide="x"></i></button>
           </header>
+          <div style="padding: 16px 24px; border-bottom: 1px solid var(--border);">
+            <button class="save-btn" id="open-create-group-btn" style="margin: 0; background: var(--bg-sidebar); border: 1px solid var(--border); color: var(--text-primary);">
+              <i data-lucide="users" style="vertical-align: middle; margin-right: 8px;"></i> Create Group Chat
+            </button>
+          </div>
           <div class="search-container">
             <div class="search-bar">
               <i data-lucide="search"></i>
@@ -259,6 +272,29 @@
           </div>
           <div class="modal-content user-list" id="user-list">
             <!-- Users injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Group Modal -->
+      <div id="create-group-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <header class="modal-header">
+            <h3>Create Group</h3>
+            <button class="icon-btn" id="close-create-group"><i data-lucide="x"></i></button>
+          </header>
+          <div class="modal-content">
+            <div class="input-group">
+              <label>Group Name</label>
+              <input type="text" id="group-name-input" placeholder="e.g. Project Nexus">
+            </div>
+            <div class="search-container" style="padding: 0 0 16px 0;">
+              <label style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; display: block;">Select Members</label>
+            </div>
+            <div class="user-list" id="group-user-list" style="border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px; max-height: 200px;">
+              <!-- Checkbox users injected here -->
+            </div>
+            <button class="save-btn" id="confirm-create-group-btn">Create Group</button>
           </div>
         </div>
       </div>
@@ -284,6 +320,7 @@
           <button class="call-btn end" id="end-call" title="End Call"><i data-lucide="phone-off"></i></button>
           <button class="call-btn accept hidden" id="accept-call" title="Accept Call"><i data-lucide="phone"></i></button>
           <button class="call-btn secondary" id="toggle-video" title="Toggle Video"><i data-lucide="video"></i></button>
+          <button class="call-btn secondary" id="share-screen-btn" title="Share Screen"><i data-lucide="monitor-up"></i></button>
         </div>
       </div>
 

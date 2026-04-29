@@ -442,6 +442,13 @@ h1, h2, h3 {
   }
 }
 
+img.emoji {
+  height: 1.2em;
+  width: 1.2em;
+  margin: 0 .05em 0 .1em;
+  vertical-align: -0.1em;
+}
+
 .message.self {
   align-self: flex-end;
   background: var(--bg-bubble-self);
@@ -478,6 +485,47 @@ h1, h2, h3 {
   gap: 4px;
 }
 
+.quoted-message {
+  background: hsla(0, 0%, 0%, 0.15);
+  border-left: 3px solid var(--accent);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.quoted-message strong {
+  color: var(--accent);
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.75rem;
+}
+
+.message-reply-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: all 0.2s;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.message.self .message-reply-btn { right: calc(100% + 10px); }
+.message.other .message-reply-btn { left: calc(100% + 10px); }
+
+.message:hover .message-reply-btn {
+  opacity: 1;
+}
+
 .status-icon {
   width: 14px;
   height: 14px;
@@ -498,19 +546,48 @@ h1, h2, h3 {
 
 .message-input-wrapper {
   flex: 1;
+  display: flex;
   background: var(--bg-chat);
-  border-radius: 16px;
-  padding: 12px 20px;
   border: 1px solid var(--border);
+  border-radius: 24px;
+}
+
+.reply-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--bg-chat);
+  border-bottom: 1px solid var(--border);
+  border-radius: 24px 24px 0 0;
+  border-left: 3px solid var(--accent);
+  margin: -1px -1px 0 -1px;
+}
+
+.reply-preview-content span {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 600;
+  display: block;
+}
+
+.reply-preview-content p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }
 
 .message-input-wrapper input {
   width: 100%;
-  background: transparent;
   border: none;
-  outline: none;
+  background: transparent;
+  padding: 16px 24px;
   color: var(--text-primary);
-  font-size: 1rem;
+  outline: none;
+  font-size: 0.95rem;
 }
 
 .send-btn {

@@ -13,11 +13,12 @@ let localStream = null;
 let remoteStream = null;
 let peerConnection = null;
 let callUnsubscribe = null;
-let activeMessages = [];
+let screenStream = null;
 let activeMessages = [];
 let isMuted = false;
 let isVideoOff = false;
 let currentCallUserId = null;
+let replyingToMessage = null;
 
 const servers = {
   iceServers: [
@@ -96,6 +97,13 @@ const videoContainer = document.getElementById('video-container');
 const ringingInfo = document.getElementById('ringing-info');
 const toggleMicBtn = document.getElementById('toggle-mic');
 const toggleVideoBtn = document.getElementById('toggle-video');
+const shareScreenBtn = document.getElementById('share-screen-btn');
+const createGroupModal = document.getElementById('create-group-modal');
+const closeCreateGroup = document.getElementById('close-create-group');
+const openCreateGroupBtn = document.getElementById('open-create-group-btn');
+const groupUserList = document.getElementById('group-user-list');
+const confirmCreateGroupBtn = document.getElementById('confirm-create-group-btn');
+const groupNameInput = document.getElementById('group-name-input');
 
 // --- AUTH LOGIC ---
 
@@ -236,19 +244,52 @@ function refreshMessages() {
 function renderMessages(messages, filter = '') {
   const filtered = messages.filter(m => (m.text || '').toLowerCase().includes(filter.toLowerCase()));
   messagesContainer.innerHTML = filtered.map(msg => `
-    <div class="message ${msg.senderId === currentUser.uid ? 'self' : 'other'}">
+    <div class="message ${msg.senderId === currentUser.uid ? 'self' : 'other'}" id="msg-${msg.id}">
       ${msg.senderId !== currentUser.uid ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
+      ${msg.replyTo ? `
+        <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
+          <strong>${msg.replyTo.senderName}</strong>
+          ${msg.replyTo.text || 'Photo'}
+        </div>
+      ` : ''}
       ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
       ${msg.text ? `<p>${msg.text}</p>` : ''}
       <div class="message-time">${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}${msg.senderId === currentUser.uid ? `<i data-lucide="check-check" class="status-icon read"></i>` : ''}</div>
+      <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
+        <i data-lucide="reply" style="width:14px;height:14px;"></i>
+      </div>
     </div>
-  `).join(''); lucide.createIcons(); messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  `).join(''); 
+  lucide.createIcons(); 
+  if (window.twemoji) twemoji.parse(messagesContainer);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+window.setReply = function(id, name, text) {
+  replyingToMessage = { id, senderName: name, text };
+  document.getElementById('reply-preview-name').innerText = name;
+  document.getElementById('reply-preview-text').innerText = text;
+  document.getElementById('reply-preview').classList.remove('hidden');
+  messageInput.focus();
+};
+
+function cancelReply() {
+  replyingToMessage = null;
+  document.getElementById('reply-preview').classList.add('hidden');
 }
 
 async function sendMessage() {
-  const text = messageInput.value.trim(); if (!text || !activeChatId) return;
+  const text = messageInput.value.trim(); if (!text && !replyingToMessage) return; // allow sending just a reply without text? No, require text.
+  if (!text || !activeChatId) return;
   const chatRef = doc(db, "chats", activeChatId); const msgRef = collection(chatRef, "messages"); messageInput.value = '';
-  await addDoc(msgRef, { text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() });
+  
+  const msgData = { text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() };
+  if (replyingToMessage) {
+    msgData.replyTo = replyingToMessage;
+    cancelReply();
+  }
+  
+  await addDoc(msgRef, msgData);
   await setDoc(chatRef, { lastMessage: text, lastMessageTime: serverTimestamp() }, { merge: true });
 }
 
@@ -277,15 +318,10 @@ async function showUserList(filter = '') {
   userListEl.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted);">No users found.</p>' : users.map(user => {
     const isFollowing = currentUser.following?.includes(user.uid);
     const isFollower = currentUser.followers?.includes(user.uid);
-    
     let btnText = "Follow";
     let btnClass = "follow-btn";
-    if (isFollowing) {
-      btnText = "Following";
-      btnClass = "follow-btn following";
-    } else if (isFollower) {
-      btnText = "Follow Back";
-    }
+    if (isFollowing) { btnText = "Following"; btnClass = "follow-btn following"; }
+    else if (isFollower) { btnText = "Follow Back"; }
 
     return `
       <div class="user-item">
@@ -299,6 +335,54 @@ async function showUserList(filter = '') {
   }).join('');
   
   document.querySelectorAll('.user-item-info').forEach(item => item.addEventListener('click', () => startPrivateChat(item.dataset.uid, item.dataset.name, item.dataset.avatar, item.dataset.username)));
+
+  // Populate Group User List (Only Mutuals)
+  const mutuals = users.filter(u => currentUser.following?.includes(u.uid) && currentUser.followers?.includes(u.uid));
+  groupUserList.innerHTML = mutuals.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">You need mutual followers to create a group.</p>' : mutuals.map(user => `
+    <div class="user-item" style="padding: 8px 16px;">
+      <div style="display: flex; align-items: center; flex: 1;">
+        <img src="${user.avatar}" alt="${user.name}" style="width: 32px; height: 32px;">
+        <div style="margin-left: 12px;"><h4>${user.name}</h4><p style="font-size: 0.7rem;">@${user.username || 'unknown'}</p></div>
+      </div>
+      <input type="checkbox" class="group-member-cb" value="${user.uid}" data-name="${user.name}" data-username="${user.username}" data-avatar="${user.avatar}" style="width: 18px; height: 18px; cursor: pointer;">
+    </div>
+  `).join('');
+}
+
+async function createGroupChat() {
+  const name = groupNameInput.value.trim();
+  if (!name) { alert("Please enter a group name."); return; }
+  const selectedCbs = Array.from(document.querySelectorAll('.group-member-cb:checked'));
+  if (selectedCbs.length === 0) { alert("Please select at least one other member."); return; }
+  
+  confirmCreateGroupBtn.disabled = true; confirmCreateGroupBtn.innerHTML = "Creating...";
+  try {
+    const participants = [currentUser.uid, ...selectedCbs.map(cb => cb.value)];
+    const participantNames = [currentUser.name, ...selectedCbs.map(cb => cb.dataset.name)];
+    const participantUsernames = [currentUser.username, ...selectedCbs.map(cb => cb.dataset.username)];
+    const participantAvatars = [currentUser.avatar, ...selectedCbs.map(cb => cb.dataset.avatar)];
+    
+    const docRef = await addDoc(collection(db, "chats"), {
+      type: 'group',
+      name: name,
+      avatar: '/images/group.png',
+      participants,
+      participantNames,
+      participantUsernames,
+      participantAvatars,
+      lastMessage: "Group created",
+      lastMessageTime: serverTimestamp()
+    });
+    
+    createGroupModal.classList.add('hidden');
+    newChatModal.classList.add('hidden');
+    switchChat(docRef.id);
+  } catch(e) {
+    console.error(e);
+    alert("Failed to create group.");
+  } finally {
+    confirmCreateGroupBtn.disabled = false; confirmCreateGroupBtn.innerHTML = "Create Group";
+  }
 }
 
 window.toggleFollow = async function(targetUid) {
@@ -343,7 +427,7 @@ function updateInfoPanel(chat) {
 async function startCall(type) {
   if (!activeChatId) return;
   const chat = chats.find(c => c.id === activeChatId);
-  if (chat.type === 'public') { alert("Public calls not supported."); return; }
+  if (chat.type === 'public' || chat.type === 'group') { alert("Calls are only supported in 1-on-1 private chats."); return; }
   const otherUid = chat.participants.find(uid => uid !== currentUser.uid);
   currentCallUserId = otherUid;
 
@@ -503,6 +587,8 @@ function toggleVideo() {
 async function endCall() {
   if (peerConnection) { peerConnection.close(); peerConnection = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  
   callOverlay.classList.add('hidden');
   videoContainer.style.display = 'none';
   acceptCallBtn.classList.add('hidden');
@@ -518,6 +604,45 @@ async function endCall() {
   toggleMicBtn.classList.remove('muted'); toggleVideoBtn.classList.remove('muted');
   toggleMicBtn.querySelector('i').setAttribute('data-lucide', 'mic');
   toggleVideoBtn.querySelector('i').setAttribute('data-lucide', 'video');
+  lucide.createIcons();
+}
+
+async function toggleScreenShare() {
+  if (!peerConnection) return;
+  const videoSender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+  if (!videoSender) return;
+
+  if (screenStream) {
+    // Stop sharing
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) videoSender.replaceTrack(videoTrack);
+    shareScreenBtn.classList.remove('muted');
+    shareScreenBtn.querySelector('i').setAttribute('data-lucide', 'monitor-up');
+  } else {
+    // Start sharing
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      videoSender.replaceTrack(screenTrack);
+      
+      screenTrack.onended = () => {
+        // Automatically revert to camera if user stops sharing via browser banner
+        screenStream = null;
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) videoSender.replaceTrack(videoTrack);
+        shareScreenBtn.classList.remove('muted');
+        shareScreenBtn.querySelector('i').setAttribute('data-lucide', 'monitor-up');
+        lucide.createIcons();
+      };
+      
+      shareScreenBtn.classList.add('muted');
+      shareScreenBtn.querySelector('i').setAttribute('data-lucide', 'monitor-off');
+    } catch (e) {
+      console.error("Screen share failed", e);
+    }
+  }
   lucide.createIcons();
 }
 
@@ -619,9 +744,16 @@ function setupEventListeners() {
   closeHelp.addEventListener('click', () => helpModal.classList.add('hidden'));
   phoneBtn?.addEventListener('click', () => startCall('Audio'));
   videoBtn?.addEventListener('click', () => startCall('Video'));
+  
+  openCreateGroupBtn.addEventListener('click', () => { createGroupModal.classList.remove('hidden'); groupNameInput.value = ''; });
+  closeCreateGroup.addEventListener('click', () => createGroupModal.classList.add('hidden'));
+  confirmCreateGroupBtn.addEventListener('click', createGroupChat);
+
   endCallBtn.addEventListener('click', endCall);
   toggleMicBtn.addEventListener('click', toggleMic);
   toggleVideoBtn.addEventListener('click', toggleVideo);
+  shareScreenBtn.addEventListener('click', toggleScreenShare);
+  document.getElementById('cancel-reply-btn')?.addEventListener('click', cancelReply);
   msgSearchToggle.addEventListener('click', () => { msgSearchBar.classList.toggle('hidden'); if (!msgSearchBar.classList.contains('hidden')) msgSearchInput.focus(); else { msgSearchInput.value = ''; renderMessages(activeMessages); } });
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
