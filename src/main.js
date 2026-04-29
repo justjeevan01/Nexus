@@ -22,6 +22,7 @@ let replyingToMessage = null;
 let currentSidebarTab = 'chats'; // 'chats' or 'requests'
 let userStatuses = {}; // Map of uid -> { isOnline: boolean, name: string, etc }
 let typingTimeout = null;
+let lastProcessedTimes = {};
 
 const servers = {
   iceServers: [
@@ -146,6 +147,7 @@ onAuthStateChanged(auth, async (user) => {
 
       await updateUserStatus(true);
       listenToUserStatuses();
+      requestNotificationPermission();
       isDarkTheme = currentUser.theme === 'dark'; applyTheme(); showApp(); loadChats(); updateProfileUI(); ensureGlobalChannel(); listenForCalls();
       if (!currentUser.username) {
         setTimeout(() => { profileModal.classList.remove('hidden'); usernameHint.innerText = "Set a unique username."; }, 1000);
@@ -163,6 +165,18 @@ onAuthStateChanged(auth, async (user) => {
 window.addEventListener('beforeunload', () => {
   if (currentUser) updateUserStatus(false);
 });
+
+async function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    await Notification.requestPermission();
+  }
+}
+
+function showNotification(title, body, icon) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body, icon });
+  }
+}
 
 async function handleLogin() {
   try {
@@ -257,6 +271,27 @@ async function ensureGlobalChannel() {
 function loadChats() {
   const q = query(collection(db, "chats"), orderBy("lastMessageTime", "desc"));
   onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'modified') {
+        const chat = change.doc.data();
+        const chatId = change.doc.id;
+        if (chat.lastMessageTime && chat.lastMessageSenderId && chat.lastMessageSenderId !== currentUser.uid) {
+          const lastTime = chat.lastMessageTime.toMillis();
+          if (!lastProcessedTimes[chatId] || lastTime > lastProcessedTimes[chatId]) {
+            lastProcessedTimes[chatId] = lastTime;
+            if (activeChatId !== chatId || document.visibilityState === 'hidden') {
+              const chatName = chat.type === 'private' ? getPrivateChatName({ id: chatId, ...chat }) : chat.name;
+              const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar({ id: chatId, ...chat }) : (chat.avatar || '/images/bot.png');
+              showNotification(chatName, chat.lastMessage, chatAvatar);
+            }
+          }
+        }
+      } else if (change.type === 'added') {
+        const chat = change.doc.data();
+        if (chat.lastMessageTime) lastProcessedTimes[change.doc.id] = chat.lastMessageTime.toMillis();
+      }
+    });
+
     chats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(chat => chat.type === 'public' || (chat.participants && chat.participants.includes(currentUser.uid)));
     renderChatList(chatSearch.value); if (activeChatId) refreshMessages();
@@ -492,7 +527,7 @@ async function sendMessage() {
   await updateDoc(doc(db, "chats", activeChatId, "messages", docRef.id), { id: docRef.id });
 
   const chat = chats.find(c => c.id === activeChatId);
-  const updates = { lastMessage: text, lastMessageTime: serverTimestamp() };
+  const updates = { lastMessage: text, lastMessageTime: serverTimestamp(), lastMessageSenderId: currentUser.uid };
   chat.participants.forEach(p => { if (p !== currentUser.uid) updates[`unreadCounts.${p}`] = increment(1); });
   await updateDoc(chatRef, updates);
 }
@@ -507,7 +542,7 @@ async function uploadChatImage(file) {
     await uploadBytes(storageRef, file);
     const imageUrl = await getDownloadURL(storageRef);
     await addDoc(msgRef, { text: '', imageUrl, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() });
-    await setDoc(chatRef, { lastMessage: '📷 Image', lastMessageTime: serverTimestamp() }, { merge: true });
+    await setDoc(chatRef, { lastMessage: '📷 Image', lastMessageTime: serverTimestamp(), lastMessageSenderId: currentUser.uid }, { merge: true });
   } catch (error) {
     console.error("Image upload failed", error);
     alert("Failed to send image.");
