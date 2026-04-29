@@ -1492,31 +1492,22 @@ function setupEventListeners() {
   let currentEl = null;
   let isSwiping = false;
 
-  messagesContainer.addEventListener('touchstart', (e) => {
-    const msg = e.target.closest('.message');
+  const handleStart = (clientX, target, e) => {
+    const msg = target.closest('.message');
     if (msg) { 
-      startX = e.touches[0].clientX; 
+      startX = clientX; 
       currentEl = msg; 
       isSwiping = true; 
       currentEl.style.transition = 'none';
       document.body.style.userSelect = 'none';
-      // Prevent scrolling during swipe
-      e.preventDefault();
+      if (e.type === 'touchstart') e.preventDefault();
     }
-  }, { passive: false });
+  };
 
-  messagesContainer.addEventListener('touchmove', (e) => {
+  const handleMove = (clientX, e) => {
     if (!isSwiping || !currentEl) return;
-    const diff = e.touches[0].clientX - startX;
-    
-    // Only prevent default if we're actually swiping (moved more than 10px horizontally)
-    if (Math.abs(diff) > 10) {
-      e.preventDefault();
-    }
-    
-    const isSelf = currentEl.classList.contains('self');
-    
-    // WhatsApp style: swipe right for everyone
+    const diff = clientX - startX;
+    if (Math.abs(diff) > 10 && e.cancelable) e.preventDefault();
     if (diff > 0 && diff < 80) {
       currentEl.style.transform = `translateX(${diff}px)`;
       const indicator = currentEl.querySelector('.swipe-indicator');
@@ -1525,82 +1516,34 @@ function setupEventListeners() {
         indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
       }
     }
-  }, { passive: false });
+  };
 
-  messagesContainer.addEventListener('touchend', (e) => {
+  const handleEnd = (clientX) => {
     if (!isSwiping || !currentEl) return;
-    const diff = e.changedTouches[0].clientX - startX;
+    const diff = clientX - startX;
     currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
     currentEl.style.transform = '';
-    
     const indicator = currentEl.querySelector('.swipe-indicator');
-    if (indicator) { 
-      indicator.style.opacity = 0; 
-      indicator.style.transform = 'translateY(-50%) scale(0.5)'; 
-    }
-
+    if (indicator) { indicator.style.opacity = 0; indicator.style.transform = 'translateY(-50%) scale(0.5)'; }
     if (diff > 60) {
       if (navigator.vibrate) navigator.vibrate(10);
       const id = currentEl.id.replace('msg-', '');
       window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
     }
-    
-    isSwiping = false; 
-    currentEl = null;
-    document.body.style.userSelect = '';
-  }, { passive: true });
+    isSwiping = false; currentEl = null; document.body.style.userSelect = '';
+  };
 
-  // Mouse events for desktop
+  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target, e), { passive: false });
+  messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX, e), { passive: false });
+  messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX), { passive: true });
+
   messagesContainer.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return; // Only left click
-    const msg = e.target.closest('.message');
-    if (msg) { 
-      startX = e.clientX; 
-      currentEl = msg; 
-      isSwiping = true; 
-      currentEl.style.transition = 'none';
-      document.body.style.userSelect = 'none';
-      e.preventDefault();
-    }
+    if (e.button !== 0) return;
+    handleStart(e.clientX, e.target, e);
   });
 
-  window.addEventListener('mousemove', (e) => { 
-    if (!isSwiping || !currentEl) return;
-    const diff = e.clientX - startX;
-    const isSelf = currentEl.classList.contains('self');
-    
-    // WhatsApp style: swipe right for everyone
-    if (diff > 0 && diff < 80) {
-      currentEl.style.transform = `translateX(${diff}px)`;
-      const indicator = currentEl.querySelector('.swipe-indicator');
-      if (indicator) {
-        indicator.style.opacity = Math.min(diff / 50, 1);
-        indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
-      }
-    }
-  });
-
-  window.addEventListener('mouseup', (e) => { 
-    if (!isSwiping || !currentEl) return;
-    const diff = e.clientX - startX;
-    currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-    currentEl.style.transform = '';
-    
-    const indicator = currentEl.querySelector('.swipe-indicator');
-    if (indicator) { 
-      indicator.style.opacity = 0; 
-      indicator.style.transform = 'translateY(-50%) scale(0.5)'; 
-    }
-
-    if (diff > 60) {
-      const id = currentEl.id.replace('msg-', '');
-      window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
-    }
-    
-    isSwiping = false; 
-    currentEl = null;
-    document.body.style.userSelect = '';
-  });
+  window.addEventListener('mousemove', (e) => { if (isSwiping) handleMove(e.clientX, e); });
+  window.addEventListener('mouseup', (e) => { if (isSwiping) handleEnd(e.clientX); });
 }
 
 function updateProfileUI() { if (!currentUser) return; document.querySelector('.user-profile img').src = currentUser.avatar; document.getElementById('my-profile-img').src = currentUser.avatar; myNameInput.value = currentUser.name; myUsernameInput.value = currentUser.username || ''; myStatusInput.value = currentUser.status; }
