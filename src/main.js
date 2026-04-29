@@ -1199,22 +1199,35 @@ async function leaveGroup() {
 async function showAddMembersList(filter = '') {
   if (!activeChatId) return;
   const chat = chats.find(c => c.id === activeChatId);
+  if (!chat) return;
+
   const snapshot = await getDocs(collection(db, "users"));
   const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }))
-    .filter(u => u.uid !== currentUser.uid && !chat.participants.includes(u.uid));
+    .filter(u => {
+      const isMe = u.uid === currentUser.uid;
+      const alreadyIn = chat.participants && chat.participants.includes(u.uid);
+      return !isMe && !alreadyIn;
+    });
 
-  const filtered = users.filter(u => u.name.toLowerCase().includes(filter.toLowerCase()) || u.username?.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = users.filter(u => {
+    const term = filter.toLowerCase();
+    return u.name.toLowerCase().includes(term) || (u.username && u.username.toLowerCase().includes(term));
+  });
 
   addMembersListEl.innerHTML = filtered.map(u => `
     <div class="user-item">
-      <input type="checkbox" value="${u.uid}" data-name="${u.name}" data-username="${u.username || ''}" data-avatar="${u.avatar || '/images/user1.png'}" style="margin-right: 15px; width: 20px; height: 20px;">
-      <img src="${u.avatar || '/images/user1.png'}" alt="${u.name}" class="avatar">
+      <input type="checkbox" value="${u.uid}" data-name="${u.name}" data-username="${u.username || ''}" data-avatar="${u.avatar || '/images/user1.png'}" style="margin-right: 15px; width: 22px; height: 22px; cursor:pointer;">
+      <img src="${u.avatar || '/images/user1.png'}" alt="${u.name}" class="avatar" style="width:40px; height:40px; border-radius:50%;">
       <div class="user-item-info">
-        <h4>${u.name}</h4>
-        <p>@${u.username || 'user'}</p>
+        <h4 style="font-size:0.95rem;">${u.name}</h4>
+        <p style="font-size:0.75rem; color:var(--text-muted);">@${u.username || 'user'}</p>
       </div>
     </div>
   `).join('');
+
+  if (filtered.length === 0) {
+    addMembersListEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">No more users to add.</div>';
+  }
 }
 
 async function addMembersToGroup() {
