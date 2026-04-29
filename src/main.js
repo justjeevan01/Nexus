@@ -27,6 +27,76 @@ let lastRenderedChatId = null;
 let lastRenderedMessageCount = 0;
 let messageListener = null;
 
+// --- GLOBAL UTILITIES ---
+window.handleTabClick = (tab) => {
+  currentSidebarTab = tab;
+  const cTab = document.getElementById('chats-tab');
+  const rTab = document.getElementById('requests-tab');
+  if (!cTab || !rTab) return;
+  
+  if (tab === 'chats') {
+    cTab.classList.add('active');
+    rTab.classList.remove('active');
+  } else {
+    rTab.classList.add('active');
+    cTab.classList.remove('active');
+  }
+  renderChatList();
+  
+  if (window.innerWidth <= 900 && activeChatId) {
+    activeChatScreen.classList.remove('active', 'hidden'); 
+    welcomeScreen.classList.remove('hidden'); 
+    activeChatScreen.classList.add('hidden'); 
+    document.querySelector('.chat-window').classList.remove('active');
+    activeChatId = null;
+  }
+};
+
+let startX = 0;
+let currentEl = null;
+let isSwiping = false;
+
+const handleStart = (clientX, target, e) => {
+  const msg = target.closest('.message');
+  if (msg) { 
+    startX = clientX; 
+    currentEl = msg; 
+    isSwiping = true; 
+    currentEl.style.transition = 'none';
+    document.body.style.userSelect = 'none';
+    if (e.type === 'touchstart' && e.cancelable) e.preventDefault();
+  }
+};
+
+const handleMove = (clientX, e) => {
+  if (!isSwiping || !currentEl) return;
+  const diff = clientX - startX;
+  if (Math.abs(diff) > 10 && e.cancelable) e.preventDefault();
+  if (diff > 0 && diff < 80) {
+    currentEl.style.transform = `translateX(${diff}px)`;
+    const indicator = currentEl.querySelector('.swipe-indicator');
+    if (indicator) {
+      indicator.style.opacity = Math.min(diff / 50, 1);
+      indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
+    }
+  }
+};
+
+const handleEnd = (clientX) => {
+  if (!isSwiping || !currentEl) return;
+  const diff = clientX - startX;
+  currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+  currentEl.style.transform = '';
+  const indicator = currentEl.querySelector('.swipe-indicator');
+  if (indicator) { indicator.style.opacity = 0; indicator.style.transform = 'translateY(-50%) scale(0.5)'; }
+  if (diff > 60) {
+    if (navigator.vibrate) navigator.vibrate(10);
+    const id = currentEl.id.replace('msg-', '');
+    window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
+  }
+  isSwiping = false; currentEl = null; document.body.style.userSelect = '';
+};
+
 const servers = {
   iceServers: [
     { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
@@ -1439,39 +1509,12 @@ function setupEventListeners() {
   msgSearchToggle.addEventListener('click', () => { msgSearchBar.classList.toggle('hidden'); if (!msgSearchBar.classList.contains('hidden')) msgSearchInput.focus(); else { msgSearchInput.value = ''; renderMessages(activeMessages); } });
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
-
-  window.handleTabClick = (tab) => {
-    currentSidebarTab = tab;
-    const cTab = document.getElementById('chats-tab');
-    const rTab = document.getElementById('requests-tab');
-    if (tab === 'chats') {
-      cTab.classList.add('active');
-      rTab.classList.remove('active');
-    } else {
-      rTab.classList.add('active');
-      cTab.classList.remove('active');
-    }
-    renderChatList();
-    
-    // On mobile, if we're in a chat, go back to sidebar view
-    if (window.innerWidth <= 900 && activeChatId) {
-      activeChatScreen.classList.remove('active', 'hidden'); 
-      welcomeScreen.classList.remove('hidden'); 
-      activeChatScreen.classList.add('hidden'); 
-      document.querySelector('.chat-window').classList.remove('active');
-      activeChatId = null; // Clear active chat so sidebar shows
-    }
-  };
-
-  document.getElementById('chats-tab').onclick = (e) => {
-    e.preventDefault();
-    window.handleTabClick('chats');
-  };
   
-  document.getElementById('requests-tab').onclick = (e) => {
-    e.preventDefault();
-    window.handleTabClick('requests');
-  };
+  acceptRequestBtn.addEventListener('click', acceptChat);
+  declineRequestBtn.addEventListener('click', declineChat);
+  closeAddMembers.addEventListener('click', () => addMembersModal.classList.add('hidden'));
+  addMembersSearchInput.addEventListener('input', (e) => showAddMembersList(e.target.value));
+  confirmAddMembersBtn.addEventListener('click', addMembersToGroup);
 
   // --- FINAL FAIL-SAFE: Capture clicks at the window level for these specific IDs ---
   window.addEventListener('click', (e) => {
@@ -1480,59 +1523,8 @@ function setupEventListeners() {
     if (chatBtn) { e.preventDefault(); window.handleTabClick('chats'); }
     if (reqBtn) { e.preventDefault(); window.handleTabClick('requests'); }
   }, true); // Use capture phase
-  acceptRequestBtn.addEventListener('click', acceptChat);
-  declineRequestBtn.addEventListener('click', declineChat);
-
-  closeAddMembers.addEventListener('click', () => addMembersModal.classList.add('hidden'));
-  addMembersSearchInput.addEventListener('input', (e) => showAddMembersList(e.target.value));
-  confirmAddMembersBtn.addEventListener('click', addMembersToGroup);
 
   // --- SWIPE TO REPLY LOGIC ---
-  let startX = 0;
-  let currentEl = null;
-  let isSwiping = false;
-
-  const handleStart = (clientX, target, e) => {
-    const msg = target.closest('.message');
-    if (msg) { 
-      startX = clientX; 
-      currentEl = msg; 
-      isSwiping = true; 
-      currentEl.style.transition = 'none';
-      document.body.style.userSelect = 'none';
-      if (e.type === 'touchstart') e.preventDefault();
-    }
-  };
-
-  const handleMove = (clientX, e) => {
-    if (!isSwiping || !currentEl) return;
-    const diff = clientX - startX;
-    if (Math.abs(diff) > 10 && e.cancelable) e.preventDefault();
-    if (diff > 0 && diff < 80) {
-      currentEl.style.transform = `translateX(${diff}px)`;
-      const indicator = currentEl.querySelector('.swipe-indicator');
-      if (indicator) {
-        indicator.style.opacity = Math.min(diff / 50, 1);
-        indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
-      }
-    }
-  };
-
-  const handleEnd = (clientX) => {
-    if (!isSwiping || !currentEl) return;
-    const diff = clientX - startX;
-    currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-    currentEl.style.transform = '';
-    const indicator = currentEl.querySelector('.swipe-indicator');
-    if (indicator) { indicator.style.opacity = 0; indicator.style.transform = 'translateY(-50%) scale(0.5)'; }
-    if (diff > 60) {
-      if (navigator.vibrate) navigator.vibrate(10);
-      const id = currentEl.id.replace('msg-', '');
-      window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
-    }
-    isSwiping = false; currentEl = null; document.body.style.userSelect = '';
-  };
-
   messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target, e), { passive: false });
   messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX, e), { passive: false });
   messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX), { passive: true });
