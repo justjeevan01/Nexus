@@ -524,8 +524,10 @@ h1, h2, h3 {
   line-height: 1.5;
   animation: messageSlide 0.3s ease-out;
   transition: transform 0.15s ease-out;
-  touch-action: pan-y;
+  touch-action: manipulation;
   cursor: grab;
+  overflow: visible;
+  will-change: transform;
 }
 
 .message:active {
@@ -672,9 +674,10 @@ img.emoji {
 .swipe-indicator {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
-  width: 30px;
-  height: 30px;
+  left: -45px;
+  transform: translateY(-50%) scale(0.5);
+  width: 32px;
+  height: 32px;
   background: var(--bg-sidebar);
   border: 1px solid var(--border);
   border-radius: 50%;
@@ -683,17 +686,20 @@ img.emoji {
   justify-content: center;
   color: var(--accent);
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.1s ease, transform 0.1s ease;
   pointer-events: none;
-  z-index: 0;
+  z-index: 10;
 }
 
+/* WhatsApp style: indicator always on left (appears as you swipe right) */
 .message.self .swipe-indicator {
-  right: -50px;
+  left: -45px;
+  right: auto;
 }
 
 .message.other .swipe-indicator {
-  left: -50px;
+  left: -45px;
+  right: auto;
 }
 
 .status-icon {

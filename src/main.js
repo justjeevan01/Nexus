@@ -76,8 +76,9 @@ const handleMove = (clientX, e) => {
     currentEl.style.transform = `translateX(${diff}px)`;
     const indicator = currentEl.querySelector('.swipe-indicator');
     if (indicator) {
-      indicator.style.opacity = Math.min(diff / 50, 1);
-      indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
+      const progress = Math.min(diff / 60, 1);
+      indicator.style.opacity = progress;
+      indicator.style.transform = `translateY(-50%) scale(${0.5 + progress * 0.7})`;
     }
   }
 };
