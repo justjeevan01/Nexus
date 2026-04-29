@@ -53,15 +53,17 @@ window.handleTabClick = (tab) => {
 };
 
 let startX = 0;
+let startY = 0;
 let currentEl = null;
 let isSwiping = false;
 let longPressTimer = null;
 let activeReactionMsgId = null;
 
-const handleStart = (clientX, target, e) => {
+const handleStart = (clientX, clientY, target, e) => {
   const msg = target.closest('.message');
   if (msg) { 
     startX = clientX; 
+    startY = clientY;
     currentEl = msg; 
     isSwiping = true; 
     currentEl.style.transition = 'none';
@@ -83,18 +85,29 @@ const handleStart = (clientX, target, e) => {
   }
 };
 
-const handleMove = (clientX, e) => {
+const handleMove = (clientX, clientY, e) => {
   if (!isSwiping || !currentEl) return;
-  const diff = clientX - startX;
-  if (Math.abs(diff) > 10) {
+  const diffX = clientX - startX;
+  const diffY = clientY - startY;
+
+  // Cancel long press timer and swipe if moving vertically (scrolling)
+  if (Math.abs(diffY) > 10 && Math.abs(diffY) > Math.abs(diffX)) {
+    if (longPressTimer) clearTimeout(longPressTimer);
+    isSwiping = false; 
+    return;
+  }
+
+  // Handle horizontal swipe
+  if (Math.abs(diffX) > 10) {
     if (longPressTimer) clearTimeout(longPressTimer); // Cancel long press if moved
     if (e.cancelable) e.preventDefault();
   }
-  if (diff > 0 && diff < 80) {
-    currentEl.style.transform = `translateX(${diff}px)`;
+  
+  if (diffX > 0 && diffX < 80) {
+    currentEl.style.transform = `translateX(${diffX}px)`;
     const indicator = currentEl.querySelector('.swipe-indicator');
     if (indicator) {
-      const progress = Math.min(diff / 60, 1);
+      const progress = Math.min(diffX / 60, 1);
       indicator.style.opacity = progress;
       indicator.style.transform = `translateY(-50%) scale(${0.5 + progress * 0.7})`;
     }
@@ -1658,14 +1671,14 @@ function setupEventListeners() {
   }, true); // Use capture phase
 
   // --- SWIPE TO REPLY LOGIC ---
-  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target, e), { passive: false });
-  messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX, e), { passive: false });
+  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.touches[0].clientY, e.target, e), { passive: false });
+  messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX, e.touches[0].clientY, e), { passive: false });
   messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX), { passive: true });
   messagesContainer.addEventListener('touchcancel', (e) => { if (isSwiping) handleEnd(startX); }, { passive: true });
 
   messagesContainer.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    handleStart(e.clientX, e.target, e);
+    handleStart(e.clientX, e.clientY, e.target, e);
   });
 
   // Prevent text selection during swipe
@@ -1673,7 +1686,7 @@ function setupEventListeners() {
     if (isSwiping) e.preventDefault();
   });
 
-  window.addEventListener('mousemove', (e) => { if (isSwiping) { e.preventDefault(); handleMove(e.clientX, e); } });
+  window.addEventListener('mousemove', (e) => { if (isSwiping) { e.preventDefault(); handleMove(e.clientX, e.clientY, e); } });
   window.addEventListener('mouseup', (e) => { if (isSwiping) handleEnd(e.clientX); });
   
   // Right-click for desktop reactions
