@@ -1050,13 +1050,43 @@ async function openGroupInfo(chat) {
       }
     };
   }
+
+  // Set DP Edit click directly here for absolute reliability
+  editBtn.onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file || !activeChatId) return;
+      const ext = file.name.split('.').pop();
+      const storageRef = ref(storage, `group_avatars/${activeChatId}.${ext}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, "chats", activeChatId), { avatar: url });
+      img.src = url;
+      document.getElementById('active-chat-avatar').src = url;
+    };
+    input.click();
+  };
 }
 
 async function leaveGroup() {
   if (!activeChatId || !confirm("Are you sure you want to leave this group?")) return;
   const chat = chats.find(c => c.id === activeChatId);
+  const isUserAdmin = isAdmin(chat);
+
+  if (isUserAdmin) {
+    if (!confirm("You are the ADMIN. Leaving will DISMANTLE (delete) the group for everyone. Continue?")) return;
+    await deleteDoc(doc(db, "chats", activeChatId));
+    document.getElementById('group-info-modal').classList.add('hidden');
+    activeChatScreen.classList.add('hidden');
+    welcomeScreen.classList.remove('hidden');
+    activeChatId = null;
+    return;
+  }
+
   const idx = chat.participants.indexOf(currentUser.uid);
-  
   if (idx !== -1) {
     const participants = [...chat.participants];
     const names = [...chat.participantNames];
@@ -1259,28 +1289,9 @@ function setupEventListeners() {
   declineRequestBtn.addEventListener('click', declineChat);
 
   document.getElementById('close-group-info')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
     document.getElementById('group-info-modal').classList.add('hidden');
   });
   document.getElementById('leave-group-btn')?.addEventListener('click', leaveGroup);
-  document.getElementById('edit-group-img-btn')?.addEventListener('click', () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file || !activeChatId) return;
-      const ext = file.name.split('.').pop();
-      const storageRef = ref(storage, `group_avatars/${activeChatId}.${ext}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      await updateDoc(doc(db, "chats", activeChatId), { avatar: url });
-      document.getElementById('group-info-img').src = url;
-      document.getElementById('active-chat-avatar').src = url;
-    };
-    input.click();
-  });
 
   // --- SWIPE TO REPLY LOGIC ---
   let startX = 0;
