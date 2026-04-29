@@ -250,7 +250,8 @@ function refreshMessages() {
 function renderMessages(messages, filter = '') {
   const filtered = messages.filter(m => (m.text || '').toLowerCase().includes(filter.toLowerCase()));
   messagesContainer.innerHTML = filtered.map(msg => `
-    <div class="message ${msg.senderId === currentUser.uid ? 'self' : 'other'}" id="msg-${msg.id}">
+    <div class="message ${msg.senderId === currentUser.uid ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
+      <div class="swipe-indicator"><i data-lucide="reply" style="width:16px;height:16px;"></i></div>
       ${msg.senderId !== currentUser.uid ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
       ${msg.replyTo ? `
         <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
@@ -788,6 +789,58 @@ function setupEventListeners() {
   msgSearchToggle.addEventListener('click', () => { msgSearchBar.classList.toggle('hidden'); if (!msgSearchBar.classList.contains('hidden')) msgSearchInput.focus(); else { msgSearchInput.value = ''; renderMessages(activeMessages); } });
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
+
+  // --- SWIPE TO REPLY LOGIC ---
+  let startX = 0;
+  let currentEl = null;
+  let isSwiping = false;
+
+  const handleStart = (clientX, target) => {
+    const msg = target.closest('.message');
+    if (msg) { startX = clientX; currentEl = msg; isSwiping = true; currentEl.style.transition = 'none'; }
+  };
+
+  const handleMove = (clientX) => {
+    if (!isSwiping || !currentEl) return;
+    const diff = clientX - startX;
+    const isSelf = currentEl.classList.contains('self');
+    
+    // WhatsApp style: swipe right for everyone
+    if (diff > 0 && diff < 80) {
+      currentEl.style.transform = `translateX(${diff}px)`;
+      const indicator = currentEl.querySelector('.swipe-indicator');
+      if (indicator) {
+        indicator.style.opacity = Math.min(diff / 50, 1);
+        indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
+      }
+    }
+  };
+
+  const handleEnd = (clientX) => {
+    if (!isSwiping || !currentEl) return;
+    const diff = clientX - startX;
+    currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    currentEl.style.transform = '';
+    
+    const indicator = currentEl.querySelector('.swipe-indicator');
+    if (indicator) { indicator.style.opacity = 0; indicator.style.transform = 'translateY(-50%) scale(0.5)'; }
+
+    if (diff > 60) {
+      if (navigator.vibrate) navigator.vibrate(10);
+      const id = currentEl.id.replace('msg-', '');
+      window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
+    }
+    
+    isSwiping = false; currentEl = null;
+  };
+
+  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target), {passive: true});
+  messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), {passive: true});
+  messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX));
+
+  messagesContainer.addEventListener('mousedown', (e) => handleStart(e.clientX, e.target));
+  window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+  window.addEventListener('mouseup', (e) => handleEnd(e.clientX));
 }
 
 function updateProfileUI() { if (!currentUser) return; document.querySelector('.user-profile img').src = currentUser.avatar; document.getElementById('my-profile-img').src = currentUser.avatar; myNameInput.value = currentUser.name; myUsernameInput.value = currentUser.username || ''; myStatusInput.value = currentUser.status; }

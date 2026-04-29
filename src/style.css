@@ -429,6 +429,13 @@ h1, h2, h3 {
   font-size: 0.95rem;
   line-height: 1.5;
   animation: messageSlide 0.3s ease-out;
+  transition: transform 0.15s ease-out;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.message:active {
+  cursor: grabbing;
 }
 
 @keyframes messageSlide {
@@ -524,6 +531,33 @@ img.emoji {
 
 .message:hover .message-reply-btn {
   opacity: 1;
+}
+
+.swipe-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.message.self .swipe-indicator {
+  right: -50px;
+}
+
+.message.other .swipe-indicator {
+  left: -50px;
 }
 
 .status-icon {
