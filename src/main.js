@@ -20,6 +20,8 @@ let isVideoOff = false;
 let currentCallUserId = null;
 let replyingToMessage = null;
 let currentSidebarTab = 'chats'; // 'chats' or 'requests'
+let userStatuses = {}; // Map of uid -> { isOnline: boolean, name: string, etc }
+let typingTimeout = null;
 
 const servers = {
   iceServers: [
@@ -142,6 +144,8 @@ onAuthStateChanged(auth, async (user) => {
         }
       });
 
+      await updateUserStatus(true);
+      listenToUserStatuses();
       isDarkTheme = currentUser.theme === 'dark'; applyTheme(); showApp(); loadChats(); updateProfileUI(); ensureGlobalChannel(); listenForCalls();
       if (!currentUser.username) {
         setTimeout(() => { profileModal.classList.remove('hidden'); usernameHint.innerText = "Set a unique username."; }, 1000);
@@ -156,6 +160,10 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
+window.addEventListener('beforeunload', () => {
+  if (currentUser) updateUserStatus(false);
+});
+
 async function handleLogin() {
   try {
     console.log("Starting Login Popup...");
@@ -168,6 +176,55 @@ async function handleLogin() {
     alert("Login failed: " + error.message);
     loginBtn.innerHTML = '<span>Sign in with Google</span>';
     lucide.createIcons();
+  }
+}
+
+async function updateUserStatus(isOnline) {
+  if (!currentUser) return;
+  await updateDoc(doc(db, "users", currentUser.uid), { isOnline });
+}
+
+function listenToUserStatuses() {
+  const q = query(collection(db, "users"));
+  onSnapshot(q, (snapshot) => {
+    snapshot.docs.forEach(d => {
+      userStatuses[d.id] = d.data();
+    });
+    renderChatList(chatSearch.value);
+    if (activeChatId) {
+      const chat = chats.find(c => c.id === activeChatId);
+      if (chat) updateHeaderStatus(chat);
+    }
+  });
+}
+
+function updateHeaderStatus(chat) {
+  const statusEl = document.getElementById('header-status');
+  if (!statusEl) return;
+  
+  if (chat.type === 'private') {
+    const otherUid = chat.participants.find(uid => uid !== currentUser.uid);
+    const status = userStatuses[otherUid];
+    const isTyping = chat.typing?.[otherUid];
+    
+    if (isTyping) {
+      statusEl.innerText = "typing...";
+      statusEl.className = "header-status";
+      document.getElementById('typing-indicator').classList.remove('hidden');
+    } else {
+      document.getElementById('typing-indicator').classList.add('hidden');
+      if (status?.isOnline) {
+        statusEl.innerText = "Online";
+        statusEl.className = "header-status";
+      } else {
+        statusEl.innerText = "Offline";
+        statusEl.className = "header-status offline";
+      }
+    }
+  } else {
+    statusEl.innerText = "Group Chat";
+    statusEl.className = "header-status offline";
+    document.getElementById('typing-indicator').classList.add('hidden');
   }
 }
 
@@ -232,9 +289,21 @@ function renderChatList(filter = '') {
     const isActive = chat.id === activeChatId;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
     const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png');
+    
+    let onlineStatusHtml = '';
+    if (chat.type === 'private') {
+      const otherUid = chat.participants.find(uid => uid !== currentUser.uid);
+      if (userStatuses[otherUid]?.isOnline) {
+        onlineStatusHtml = '<div class="online-dot"></div>';
+      }
+    }
+
     return `
       <div class="chat-item ${isActive ? 'active' : ''}" data-id="${chat.id}">
-        <img src="${chatAvatar}" alt="${chatName}" class="avatar">
+        <div style="position: relative;">
+          <img src="${chatAvatar}" alt="${chatName}" class="avatar">
+          ${onlineStatusHtml}
+        </div>
         <div class="chat-item-content">
           <div class="chat-item-header">
             <h3>${chatName}</h3>
@@ -267,8 +336,14 @@ function switchChat(id) {
   const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png');
   welcomeScreen.classList.add('hidden'); activeChatScreen.classList.remove('hidden', 'active'); activeChatScreen.classList.add('active'); 
   document.querySelector('.chat-window').classList.add('active');
-  activeChatInfo.innerHTML = `<img src="${chatAvatar}" alt="${chatName}" class="avatar"><div class="chat-info-text"><h3>${chatName}</h3><span>${chat.type === 'public' ? 'Global Channel' : 'Direct Message'}</span></div>`;
+  activeChatInfo.innerHTML = `
+    <img src="${chatAvatar}" alt="${chatName}" class="avatar">
+    <div class="chat-info-text">
+      <h3>${chatName}</h3>
+      <span id="header-status" class="header-status">Offline</span>
+    </div>`;
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages(); updateInfoPanel(chat);
+  updateHeaderStatus(chat);
   
   if (chat.status === 'pending' && chat.initiator !== currentUser.uid) {
     requestBanner.classList.remove('hidden');
@@ -669,7 +744,7 @@ async function acceptCall(callerUid, callType) {
   onSnapshot(offerCandidates, (snapshot) => {
     snapshot.docChanges().forEach((change) => { if (change.type === 'added') peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data())); });
   });
-  acceptCallBtn.classList.add('hidden');
+  acceptCallBtn.classList.remove('hidden');
 }
 
 function toggleMic() {
@@ -803,6 +878,17 @@ async function handleAvatarUpload(file) {
 function setupEventListeners() {
   loginBtn.addEventListener('click', handleLogin); sendBtn.addEventListener('click', sendMessage);
   messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+  messageInput.addEventListener('input', () => {
+    if (!activeChatId) return;
+    if (!typingTimeout) {
+      updateDoc(doc(db, "chats", activeChatId), { [`typing.${currentUser.uid}`]: true });
+    }
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      updateDoc(doc(db, "chats", activeChatId), { [`typing.${currentUser.uid}`]: false });
+      typingTimeout = null;
+    }, 2000);
+  });
   attachBtn.addEventListener('click', () => chatImageUpload.click());
   chatImageUpload.addEventListener('change', (e) => {
     if (e.target.files[0]) uploadChatImage(e.target.files[0]);
@@ -875,7 +961,7 @@ function setupEventListeners() {
     }
     mainMenu.classList.add('hidden'); 
   });
-  logoutBtn.addEventListener('click', () => { if(confirm('Log out?')) signOut(auth); });
+  logoutBtn.addEventListener('click', async () => { if(confirm('Log out?')) { await updateUserStatus(false); signOut(auth); } });
   menuProfileBtn.addEventListener('click', () => profileModal.classList.remove('hidden'));
   menuSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
   menuHelpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
