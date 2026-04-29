@@ -150,6 +150,7 @@ onAuthStateChanged(auth, async (user) => {
       await updateUserStatus(true);
       listenToUserStatuses();
       requestNotificationPermission();
+      requestMediaPermissions();
       isDarkTheme = currentUser.theme === 'dark'; applyTheme(); showApp(); loadChats(); updateProfileUI(); ensureGlobalChannel(); listenForCalls();
       if (!currentUser.username) {
         setTimeout(() => { profileModal.classList.remove('hidden'); usernameHint.innerText = "Set a unique username."; }, 1000);
@@ -177,6 +178,16 @@ async function requestNotificationPermission() {
 function showNotification(title, body, icon) {
   if ("Notification" in window && Notification.permission === "granted") {
     new Notification(title, { body, icon });
+  }
+}
+
+async function requestMediaPermissions() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    stream.getTracks().forEach(t => t.stop());
+    console.log("Media permissions pre-authorized.");
+  } catch (e) {
+    console.warn("Media permissions not granted yet:", e);
   }
 }
 
@@ -727,15 +738,22 @@ async function startCall(type) {
     event.candidate && addDoc(offerCandidates, event.candidate.toJSON());
   };
 
-  const offerDescription = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offerDescription);
+  try {
+    const offerDescription = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offerDescription);
 
-  const offer = {
-    sdp: offerDescription.sdp, type: offerDescription.type, from: currentUser.uid, 
-    fromName: currentUser.name, fromAvatar: currentUser.avatar, callType: type, timestamp: serverTimestamp()
-  };
+    const offer = {
+      sdp: offerDescription.sdp, type: offerDescription.type, from: currentUser.uid, 
+      fromName: currentUser.name, fromAvatar: currentUser.avatar, callType: type, timestamp: serverTimestamp()
+    };
 
-  await setDoc(callDoc, { offer });
+    await setDoc(callDoc, { offer });
+    console.log("Call offer sent successfully to:", otherUid);
+  } catch (e) {
+    console.error("Failed to start call signaling:", e);
+    alert("Could not start call. Please check your camera/mic permissions.");
+    endCall();
+  }
 
   onSnapshot(callDoc, (snapshot) => {
     if (!snapshot.exists()) {
