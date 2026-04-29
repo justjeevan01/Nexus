@@ -984,6 +984,19 @@ async function endCall() {
 }
 
 async function toggleScreenShare() {
+  // Check if screen sharing is supported (not available on most mobile browsers)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    alert('Screen sharing is not supported on this device. This feature is only available on desktop browsers.');
+    return;
+  }
+
+  // Additional mobile detection
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+  if (isMobile) {
+    alert('Screen sharing is not supported on mobile devices. Please use a desktop browser for this feature.');
+    return;
+  }
+
   if (!peerConnection) return;
   const videoSender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
   if (!videoSender) return;
@@ -1002,7 +1015,7 @@ async function toggleScreenShare() {
       screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = screenStream.getVideoTracks()[0];
       videoSender.replaceTrack(screenTrack);
-      
+
       screenTrack.onended = () => {
         // Automatically revert to camera if user stops sharing via browser banner
         screenStream = null;
@@ -1012,11 +1025,12 @@ async function toggleScreenShare() {
         shareScreenBtn.querySelector('i').setAttribute('data-lucide', 'monitor-up');
         lucide.createIcons();
       };
-      
+
       shareScreenBtn.classList.add('muted');
       shareScreenBtn.querySelector('i').setAttribute('data-lucide', 'monitor-off');
     } catch (e) {
       console.error("Screen share failed", e);
+      alert('Failed to start screen sharing. Please make sure you have granted the necessary permissions.');
     }
   }
   lucide.createIcons();
@@ -1346,6 +1360,10 @@ function setupEventListeners() {
     welcomeScreen.classList.remove('hidden'); 
     activeChatScreen.classList.add('hidden'); 
     document.querySelector('.chat-window').classList.remove('active');
+    // On mobile, show the sidebar again
+    if (window.innerWidth <= 900) {
+      // The sidebar is always visible on mobile, so this should work
+    }
   });
   profileBtn.addEventListener('click', () => profileModal.classList.remove('hidden'));
   closeProfile.addEventListener('click', () => profileModal.classList.add('hidden'));
@@ -1434,6 +1452,15 @@ function setupEventListeners() {
       cTab.classList.remove('active');
     }
     renderChatList();
+    
+    // On mobile, if we're in a chat, go back to sidebar view
+    if (window.innerWidth <= 900 && activeChatId) {
+      activeChatScreen.classList.remove('active', 'hidden'); 
+      welcomeScreen.classList.remove('hidden'); 
+      activeChatScreen.classList.add('hidden'); 
+      document.querySelector('.chat-window').classList.remove('active');
+      activeChatId = null; // Clear active chat so sidebar shows
+    }
   };
 
   document.getElementById('chats-tab').onclick = (e) => {
@@ -1465,20 +1492,28 @@ function setupEventListeners() {
   let currentEl = null;
   let isSwiping = false;
 
-  const handleStart = (clientX, target, e) => {
-    const msg = target.closest('.message');
+  messagesContainer.addEventListener('touchstart', (e) => {
+    const msg = e.target.closest('.message');
     if (msg) { 
-      startX = clientX; 
+      startX = e.touches[0].clientX; 
       currentEl = msg; 
       isSwiping = true; 
       currentEl.style.transition = 'none';
-      document.body.style.userSelect = 'none'; // Prevent text selection
+      document.body.style.userSelect = 'none';
+      // Prevent scrolling during swipe
+      e.preventDefault();
     }
-  };
+  }, { passive: false });
 
-  const handleMove = (clientX) => {
+  messagesContainer.addEventListener('touchmove', (e) => {
     if (!isSwiping || !currentEl) return;
-    const diff = clientX - startX;
+    const diff = e.touches[0].clientX - startX;
+    
+    // Only prevent default if we're actually swiping (moved more than 10px horizontally)
+    if (Math.abs(diff) > 10) {
+      e.preventDefault();
+    }
+    
     const isSelf = currentEl.classList.contains('self');
     
     // WhatsApp style: swipe right for everyone
@@ -1490,16 +1525,19 @@ function setupEventListeners() {
         indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
       }
     }
-  };
+  }, { passive: false });
 
-  const handleEnd = (clientX) => {
+  messagesContainer.addEventListener('touchend', (e) => {
     if (!isSwiping || !currentEl) return;
-    const diff = clientX - startX;
+    const diff = e.changedTouches[0].clientX - startX;
     currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
     currentEl.style.transform = '';
     
     const indicator = currentEl.querySelector('.swipe-indicator');
-    if (indicator) { indicator.style.opacity = 0; indicator.style.transform = 'translateY(-50%) scale(0.5)'; }
+    if (indicator) { 
+      indicator.style.opacity = 0; 
+      indicator.style.transform = 'translateY(-50%) scale(0.5)'; 
+    }
 
     if (diff > 60) {
       if (navigator.vibrate) navigator.vibrate(10);
@@ -1510,18 +1548,59 @@ function setupEventListeners() {
     isSwiping = false; 
     currentEl = null;
     document.body.style.userSelect = '';
-  };
+  }, { passive: true });
 
-  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target, e), {passive: true});
-  messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), {passive: true});
-  messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX));
-
+  // Mouse events for desktop
   messagesContainer.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return; // Only left click
-    handleStart(e.clientX, e.target, e);
+    const msg = e.target.closest('.message');
+    if (msg) { 
+      startX = e.clientX; 
+      currentEl = msg; 
+      isSwiping = true; 
+      currentEl.style.transition = 'none';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    }
   });
-  window.addEventListener('mousemove', (e) => { if (isSwiping) { e.preventDefault(); handleMove(e.clientX); } });
-  window.addEventListener('mouseup', (e) => { if (isSwiping) handleEnd(e.clientX); });
+
+  window.addEventListener('mousemove', (e) => { 
+    if (!isSwiping || !currentEl) return;
+    const diff = e.clientX - startX;
+    const isSelf = currentEl.classList.contains('self');
+    
+    // WhatsApp style: swipe right for everyone
+    if (diff > 0 && diff < 80) {
+      currentEl.style.transform = `translateX(${diff}px)`;
+      const indicator = currentEl.querySelector('.swipe-indicator');
+      if (indicator) {
+        indicator.style.opacity = Math.min(diff / 50, 1);
+        indicator.style.transform = `translateY(-50%) scale(${Math.min(diff / 50, 1.2)})`;
+      }
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => { 
+    if (!isSwiping || !currentEl) return;
+    const diff = e.clientX - startX;
+    currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    currentEl.style.transform = '';
+    
+    const indicator = currentEl.querySelector('.swipe-indicator');
+    if (indicator) { 
+      indicator.style.opacity = 0; 
+      indicator.style.transform = 'translateY(-50%) scale(0.5)'; 
+    }
+
+    if (diff > 60) {
+      const id = currentEl.id.replace('msg-', '');
+      window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
+    }
+    
+    isSwiping = false; 
+    currentEl = null;
+    document.body.style.userSelect = '';
+  });
 }
 
 function updateProfileUI() { if (!currentUser) return; document.querySelector('.user-profile img').src = currentUser.avatar; document.getElementById('my-profile-img').src = currentUser.avatar; myNameInput.value = currentUser.name; myUsernameInput.value = currentUser.username || ''; myStatusInput.value = currentUser.status; }
