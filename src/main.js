@@ -779,6 +779,7 @@ function showIncomingCall(data) {
 }
 
 async function acceptCall(callerUid, callType) {
+  acceptCallBtn.classList.add('hidden');
   callStatus.innerText = "Connecting...";
   currentCallUserId = callerUid;
   peerConnection = new RTCPeerConnection(servers);
@@ -790,31 +791,50 @@ async function acceptCall(callerUid, callType) {
     }
   };
 
-  localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'Video', audio: true });
-  localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-  localVideo.srcObject = localStream;
-  if (callType === 'Video') localVideo.classList.remove('hidden');
-  videoContainer.style.display = 'block';
-  peerConnection.ontrack = (event) => {
-    event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-    remoteVideo.srcObject = remoteStream;
-    remoteVideo.play().catch(e => console.error("Playback failed", e));
-    ringingInfo.style.opacity = '0';
-    setTimeout(() => ringingInfo.classList.add('hidden'), 400);
-  };
-  const callDoc = doc(db, "calls", currentUser.uid);
-  const offerCandidates = collection(callDoc, "offerCandidates");
-  const answerCandidates = collection(callDoc, "answerCandidates");
-  peerConnection.onicecandidate = (event) => { event.candidate && addDoc(answerCandidates, event.candidate.toJSON()); };
-  const callData = (await getDoc(callDoc)).data();
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
-  const answerDescription = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answerDescription);
-  await updateDoc(callDoc, { answer: { type: answerDescription.type, sdp: answerDescription.sdp } });
-  onSnapshot(offerCandidates, (snapshot) => {
-    snapshot.docChanges().forEach((change) => { if (change.type === 'added') peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data())); });
-  });
-  acceptCallBtn.classList.remove('hidden');
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: callType === 'Video', audio: true });
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    localVideo.srcObject = localStream;
+    if (callType === 'Video') localVideo.classList.remove('hidden');
+    videoContainer.style.display = 'block';
+
+    peerConnection.ontrack = (event) => {
+      event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      remoteVideo.srcObject = remoteStream;
+      remoteVideo.play().catch(e => console.error("Playback failed", e));
+      ringingInfo.style.opacity = '0';
+      setTimeout(() => ringingInfo.classList.add('hidden'), 400);
+    };
+
+    const callDoc = doc(db, "calls", currentUser.uid);
+    const offerCandidates = collection(callDoc, "offerCandidates");
+    const answerCandidates = collection(callDoc, "answerCandidates");
+
+    peerConnection.onicecandidate = (event) => {
+      event.candidate && addDoc(answerCandidates, event.candidate.toJSON());
+    };
+
+    const callData = (await getDoc(callDoc)).data();
+    if (!callData?.offer) { endCall(); return; }
+
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
+    const answerDescription = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answerDescription);
+
+    await updateDoc(callDoc, { answer: { type: answerDescription.type, sdp: answerDescription.sdp } });
+
+    onSnapshot(offerCandidates, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(e => {});
+        }
+      });
+    });
+  } catch (e) {
+    console.error("Call acceptance failed:", e);
+    alert("Could not access camera/microphone.");
+    endCall();
+  }
 }
 
 function toggleMic() {
