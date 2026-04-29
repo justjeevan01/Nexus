@@ -1465,9 +1465,15 @@ function setupEventListeners() {
   let currentEl = null;
   let isSwiping = false;
 
-  const handleStart = (clientX, target) => {
+  const handleStart = (clientX, target, e) => {
     const msg = target.closest('.message');
-    if (msg) { startX = clientX; currentEl = msg; isSwiping = true; currentEl.style.transition = 'none'; }
+    if (msg) { 
+      startX = clientX; 
+      currentEl = msg; 
+      isSwiping = true; 
+      currentEl.style.transition = 'none';
+      document.body.style.userSelect = 'none'; // Prevent text selection
+    }
   };
 
   const handleMove = (clientX) => {
@@ -1501,16 +1507,21 @@ function setupEventListeners() {
       window.setReply(id, currentEl.dataset.sender, currentEl.dataset.text);
     }
     
-    isSwiping = false; currentEl = null;
+    isSwiping = false; 
+    currentEl = null;
+    document.body.style.userSelect = '';
   };
 
-  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target), {passive: true});
+  messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target, e), {passive: true});
   messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), {passive: true});
   messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX));
 
-  messagesContainer.addEventListener('mousedown', (e) => handleStart(e.clientX, e.target));
-  window.addEventListener('mousemove', (e) => handleMove(e.clientX));
-  window.addEventListener('mouseup', (e) => handleEnd(e.clientX));
+  messagesContainer.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // Only left click
+    handleStart(e.clientX, e.target, e);
+  });
+  window.addEventListener('mousemove', (e) => { if (isSwiping) { e.preventDefault(); handleMove(e.clientX); } });
+  window.addEventListener('mouseup', (e) => { if (isSwiping) handleEnd(e.clientX); });
 }
 
 function updateProfileUI() { if (!currentUser) return; document.querySelector('.user-profile img').src = currentUser.avatar; document.getElementById('my-profile-img').src = currentUser.avatar; myNameInput.value = currentUser.name; myUsernameInput.value = currentUser.username || ''; myStatusInput.value = currentUser.status; }
