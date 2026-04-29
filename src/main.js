@@ -402,21 +402,33 @@ function getPrivateChatAvatar(chat) {
   return index !== -1 && chat.participantAvatars ? chat.participantAvatars[index] : "/images/user1.png";
 }
 
-let messageListener = null;
 function switchChat(id) {
-  activeChatId = id; const chat = chats.find(c => c.id === id);
+  console.log("Switching to chat:", id);
+  activeChatId = id; 
+  const chat = chats.find(c => c.id === id);
+  if (!chat) return;
+
   const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
-  const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png');
-  welcomeScreen.classList.add('hidden'); activeChatScreen.classList.remove('hidden', 'active'); activeChatScreen.classList.add('active'); 
+  const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/group.png');
+  
+  welcomeScreen.classList.add('hidden'); 
+  activeChatScreen.classList.remove('hidden', 'active'); 
+  activeChatScreen.classList.add('active'); 
   document.querySelector('.chat-window').classList.add('active');
+  
   activeChatInfo.innerHTML = `
     <img src="${chatAvatar}" alt="${chatName}" class="avatar" id="active-chat-avatar">
     <div class="chat-info-text">
       <h3>${chatName}</h3>
       <span id="header-status" class="header-status">Offline</span>
     </div>`;
+  
   activeChatInfo.style.cursor = chat.type === 'group' ? 'pointer' : 'default';
-  activeChatInfo.onclick = chat.type === 'group' ? () => openGroupInfo(chat) : null;
+  activeChatInfo.onclick = chat.type === 'group' ? () => {
+    // Always find latest chat data before opening info
+    const latestChat = chats.find(c => c.id === id);
+    openGroupInfo(latestChat);
+  } : null;
   
   lucide.createIcons();
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages();
@@ -1035,6 +1047,12 @@ async function openGroupInfo(chat) {
     </div>
   `).join('');
 
+  const leaveBtn = document.getElementById('leave-group-btn');
+  if (leaveBtn) {
+    leaveBtn.innerText = isUserAdmin ? "Dismantle Group" : "Leave Group";
+    leaveBtn.style.background = isUserAdmin ? "hsl(0, 80%, 40%)" : "hsl(0, 70%, 50%)";
+  }
+
   lucide.createIcons();
   modal.classList.remove('hidden');
 
@@ -1280,6 +1298,7 @@ function setupEventListeners() {
   });
   requestsTab.addEventListener('click', () => { 
     console.log("Switching to Requests tab");
+    console.table(chats.map(c => ({ id: c.id, status: c.status, initiator: c.initiator, type: c.type })));
     currentSidebarTab = 'requests'; 
     requestsTab.classList.add('active'); 
     chatsTab.classList.remove('active'); 
