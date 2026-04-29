@@ -64,6 +64,15 @@ const handleStart = (clientX, target, e) => {
     isSwiping = true; 
     currentEl.style.transition = 'none';
     document.body.style.userSelect = 'none';
+    // Position indicator using fixed coords to bypass any overflow:hidden ancestor
+    const indicator = currentEl.querySelector('.swipe-indicator');
+    if (indicator) {
+      const rect = currentEl.getBoundingClientRect();
+      indicator.style.top = (rect.top + rect.height / 2 - 16) + 'px';
+      indicator.style.left = (rect.left - 50) + 'px';
+      indicator.style.opacity = '0';
+      indicator.style.transform = 'scale(0.5)';
+    }
     if (e.type === 'touchstart' && e.cancelable) e.preventDefault();
   }
 };
@@ -78,7 +87,10 @@ const handleMove = (clientX, e) => {
     if (indicator) {
       const progress = Math.min(diff / 60, 1);
       indicator.style.opacity = progress;
-      indicator.style.transform = `translateY(-50%) scale(${0.5 + progress * 0.7})`;
+      indicator.style.transform = `scale(${0.5 + progress * 0.7})`;
+      // Update left position as message moves right
+      const rect = currentEl.getBoundingClientRect();
+      indicator.style.left = (rect.left - 50 + diff) + 'px';
     }
   }
 };
@@ -89,7 +101,10 @@ const handleEnd = (clientX) => {
   currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
   currentEl.style.transform = '';
   const indicator = currentEl.querySelector('.swipe-indicator');
-  if (indicator) { indicator.style.opacity = 0; indicator.style.transform = 'translateY(-50%) scale(0.5)'; }
+  if (indicator) { 
+    indicator.style.opacity = '0'; 
+    indicator.style.transform = 'scale(0.5)'; 
+  }
   if (diff > 60) {
     if (navigator.vibrate) navigator.vibrate(10);
     const id = currentEl.id.replace('msg-', '');
