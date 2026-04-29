@@ -291,7 +291,7 @@ async function ensureGlobalChannel() {
     const chatSnap = await getDoc(chatRef);
     if (!chatSnap.exists()) {
       await setDoc(chatRef, {
-        name: "Public Square", avatar: "/images/bot.png", description: "The official Nexus global channel.",
+        name: "Public Square", avatar: "/images/group.png", description: "The official Nexus global channel.",
         lastMessage: "Welcome to Nexus!", lastMessageTime: serverTimestamp(), type: 'public', participants: []
       });
     }
@@ -316,7 +316,7 @@ function loadChats() {
             lastProcessedTimes[chatId] = lastTime;
             if (activeChatId !== chatId || document.visibilityState === 'hidden') {
               const chatName = chat.type === 'private' ? getPrivateChatName({ id: chatId, ...chat }) : chat.name;
-              const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar({ id: chatId, ...chat }) : (chat.avatar || '/images/bot.png');
+              const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar({ id: chatId, ...chat }) : (chat.avatar || '/images/group.png');
               showNotification(chatName, chat.lastMessage, chatAvatar);
             }
           }
