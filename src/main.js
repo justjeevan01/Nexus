@@ -157,7 +157,6 @@ onAuthStateChanged(auth, async (user) => {
       await updateUserStatus(true);
       listenToUserStatuses();
       requestNotificationPermission();
-      requestMediaPermissions();
       isDarkTheme = currentUser.theme === 'dark'; applyTheme(); showApp(); loadChats(); updateProfileUI(); ensureGlobalChannel(); listenForCalls();
       if (!currentUser.username) {
         setTimeout(() => { profileModal.classList.remove('hidden'); usernameHint.innerText = "Set a unique username."; }, 1000);
@@ -1446,6 +1445,14 @@ function setupEventListeners() {
     e.preventDefault();
     window.handleTabClick('requests');
   };
+
+  // --- FINAL FAIL-SAFE: Capture clicks at the window level for these specific IDs ---
+  window.addEventListener('click', (e) => {
+    const chatBtn = e.target.closest('#chats-tab');
+    const reqBtn = e.target.closest('#requests-tab');
+    if (chatBtn) { e.preventDefault(); window.handleTabClick('chats'); }
+    if (reqBtn) { e.preventDefault(); window.handleTabClick('requests'); }
+  }, true); // Use capture phase
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);
 
