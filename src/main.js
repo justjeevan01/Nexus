@@ -394,7 +394,7 @@ function switchChat(id) {
       <h3>${chatName}</h3>
       <span id="header-status" class="header-status">Offline</span>
     </div>`;
-  msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages(); updateInfoPanel(chat);
+  msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages();
   updateHeaderStatus(chat);
   
   if (chat.status === 'pending' && chat.initiator !== currentUser.uid) {
@@ -583,13 +583,15 @@ async function sendMessage() {
 async function uploadChatImage(file) {
   if (!file || !activeChatId) return;
   const chatRef = doc(db, "chats", activeChatId); 
-  const msgRef = collection(chatRef, "messages");
+  const msgRef = doc(collection(chatRef, "messages"));
+  const msgId = msgRef.id;
   try {
     const ext = file.name.split('.').pop();
     const storageRef = ref(storage, `chat_images/${activeChatId}/${Date.now()}.${ext}`);
     await uploadBytes(storageRef, file);
     const imageUrl = await getDownloadURL(storageRef);
-    await addDoc(msgRef, { text: '', imageUrl, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp(), readBy: [currentUser.uid] });
+    const msgData = { id: msgId, text: '', imageUrl, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp(), readBy: [currentUser.uid] };
+    await setDoc(msgRef, msgData);
     await setDoc(chatRef, { lastMessage: '📷 Image', lastMessageTime: serverTimestamp(), lastMessageSenderId: currentUser.uid }, { merge: true });
   } catch (error) {
     console.error("Image upload failed", error);
@@ -687,11 +689,6 @@ async function startPrivateChat(uid, name, avatar, username) {
   
   newChatModal.classList.add('hidden');
   switchChat(docRef.id);
-}
-
-function updateInfoPanel(chat) {
-  const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name; const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png'); const otherUsername = chat.type === 'private' ? (chat.participantUsernames?.find(u => u !== currentUser.username) || '') : '';
-  contactDetails.innerHTML = `<img src="${chatAvatar}" alt="${chatName}" class="avatar" style="border-radius: 40px; border: 4px solid var(--border);"><h2>${chatName}</h2>${otherUsername ? `<p style="color: var(--accent); margin-bottom: 10px;">@${otherUsername}</p>` : ''}<p>${chat.type === 'public' ? 'Shared Channel' : 'Direct Message'}</p><div style="margin-top: 30px; text-align: left;"><h4 style="color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; margin-bottom: 10px;">About</h4><p style="color: var(--text-primary);">${chat.description || 'A nexus channel.'}</p></div>`;
 }
 
 // --- REAL WebRTC CALLING LOGIC ---
@@ -1015,8 +1012,6 @@ function setupEventListeners() {
   });
   themeToggleBtn.addEventListener('click', toggleTheme); settingsThemeToggleBtn.addEventListener('click', toggleTheme);
   chatSearch.addEventListener('input', (e) => renderChatList(e.target.value));
-  infoToggle.addEventListener('click', () => infoPanel.classList.toggle('hidden'));
-  closeInfo.addEventListener('click', () => infoPanel.classList.add('hidden'));
   backBtn.addEventListener('click', () => { 
     activeChatScreen.classList.remove('active', 'hidden'); 
     welcomeScreen.classList.remove('hidden'); 
