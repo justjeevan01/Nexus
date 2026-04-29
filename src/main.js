@@ -657,6 +657,7 @@ function renderMessages(messages, filter = '') {
   
   if (isSameState) {
     updateReadReceipts(filtered, currentChat);
+    updateReactionsUI(filtered);
     return;
   }
 
@@ -750,6 +751,39 @@ function updateReadReceipts(messages, chat) {
     }
   });
 }
+
+function updateReactionsUI(messages) {
+  messages.forEach(msg => {
+    const el = document.getElementById(`msg-${msg.id}`);
+    if (el) {
+      let existingContainer = el.querySelector('.reaction-container');
+      
+      let reactionsHtml = '';
+      if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+        const reactionCounts = {};
+        Object.values(msg.reactions).forEach(emoji => {
+          reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+        });
+        reactionsHtml = '<div class="reaction-container">' + 
+          Object.entries(reactionCounts).map(([emoji, count]) => 
+            `<div class="reaction-badge">${emoji} ${count > 1 ? count : ''}</div>`
+          ).join('') +
+        '</div>';
+      }
+
+      if (reactionsHtml) {
+        if (existingContainer) {
+          existingContainer.outerHTML = reactionsHtml;
+        } else {
+          el.insertAdjacentHTML('beforeend', reactionsHtml);
+        }
+      } else if (existingContainer) {
+        existingContainer.remove();
+      }
+    }
+  });
+}
+
 
 window.setReply = function(id, name, text) {
   replyingToMessage = { id, senderName: name, text };
