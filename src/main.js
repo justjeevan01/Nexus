@@ -539,10 +539,20 @@ function switchChat(id) {
 
 async function acceptChat() {
   if (!activeChatId) return;
-  await updateDoc(doc(db, "chats", activeChatId), { status: 'active' });
-  requestBanner.classList.add('hidden');
-  chatFooter.classList.remove('hidden');
-  markMessagesAsRead(activeChatId); resetUnreadCount(activeChatId);
+  const id = activeChatId;
+  try {
+    // Immediately update UI for better UX
+    requestBanner.classList.add('hidden');
+    chatFooter.classList.remove('hidden');
+    
+    await updateDoc(doc(db, "chats", id), { status: 'active' });
+    markMessagesAsRead(id); resetUnreadCount(id);
+  } catch (error) {
+    console.error("Error accepting chat:", error);
+    alert("Failed to accept request. Please try again.");
+    requestBanner.classList.remove('hidden');
+    chatFooter.classList.add('hidden');
+  }
 }
 
 async function declineChat() {
@@ -551,7 +561,12 @@ async function declineChat() {
   activeChatId = null;
   activeChatScreen.classList.add('hidden');
   welcomeScreen.classList.remove('hidden');
-  await deleteDoc(doc(db, "chats", id));
+  try {
+    await deleteDoc(doc(db, "chats", id));
+  } catch (error) {
+    console.error("Error declining chat:", error);
+    alert("Failed to decline request.");
+  }
 }
 
 async function markMessagesAsRead(chatId) {
@@ -631,13 +646,30 @@ function renderMessages(messages, filter = '') {
     const isSelf = msg.senderId === currentUser.uid;
     const isRead = currentChat?.participants?.filter(p => p !== msg.senderId).every(p => msg.readBy?.includes(p));
     
+    // Dynamically get the latest name from chat participants so profile updates reflect immediately
+    let displaySenderName = msg.senderName;
+    if (currentChat && currentChat.participants && currentChat.participantNames) {
+      const idx = currentChat.participants.indexOf(msg.senderId);
+      if (idx !== -1 && currentChat.participantNames[idx]) {
+        displaySenderName = currentChat.participantNames[idx];
+      }
+    }
+
+    let replySenderName = msg.replyTo?.senderName || '';
+    if (msg.replyTo && currentChat && currentChat.participants && currentChat.participantNames) {
+      const rIdx = currentChat.participants.indexOf(msg.replyTo.senderId);
+      if (rIdx !== -1 && currentChat.participantNames[rIdx]) {
+        replySenderName = currentChat.participantNames[rIdx];
+      }
+    }
+    
     return dateDivider + `
-      <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
+      <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${displaySenderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
         <div class="swipe-indicator"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></div>
-        ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
+        ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${displaySenderName}</span>` : ''}
         ${msg.replyTo ? `
           <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
-            <strong>${msg.replyTo.senderName}</strong>
+            <strong>${replySenderName}</strong>
             ${msg.replyTo.text || 'Photo'}
           </div>
         ` : ''}
