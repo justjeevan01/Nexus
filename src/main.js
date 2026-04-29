@@ -1024,14 +1024,18 @@ async function openGroupInfo(chat) {
   lucide.createIcons();
   modal.classList.remove('hidden');
 
-  document.getElementById('edit-group-name-btn')?.onclick = async () => {
-    const newName = prompt("Enter new group name:", chat.name);
-    if (newName && newName !== chat.name) {
-      await updateDoc(doc(db, "chats", chat.id), { name: newName });
-      name.innerHTML = newName + ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>';
-      lucide.createIcons();
-    }
-  };
+  const editNameBtn = document.getElementById('edit-group-name-btn');
+  if (editNameBtn) {
+    editNameBtn.onclick = async () => {
+      const newName = prompt("Enter new group name:", chat.name);
+      if (newName && newName !== chat.name) {
+        await updateDoc(doc(db, "chats", chat.id), { name: newName });
+        name.innerHTML = newName + ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>';
+        lucide.createIcons();
+        openGroupInfo({ ...chat, name: newName }); // Refresh modal with new name
+      }
+    };
+  }
 }
 
 async function leaveGroup() {
