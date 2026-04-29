@@ -993,6 +993,12 @@ async function toggleScreenShare() {
   lucide.createIcons();
 }
 
+function isAdmin(chat) {
+  if (!chat || !currentUser) return false;
+  const adminUid = chat.createdBy || chat.participants?.[0];
+  return adminUid === currentUser.uid;
+}
+
 async function openGroupInfo(chat) {
   const modal = document.getElementById('group-info-modal');
   const img = document.getElementById('group-info-img');
@@ -1001,12 +1007,20 @@ async function openGroupInfo(chat) {
   const memberLabel = document.getElementById('member-count-label');
   const editBtn = document.getElementById('edit-group-img-btn');
 
+  const adminUid = chat.createdBy || chat.participants?.[0];
+  const isUserAdmin = isAdmin(chat);
+
+  // Auto-fix for older groups: if createdBy is missing, set it to the first participant
+  if (!chat.createdBy && chat.participants?.length > 0) {
+    updateDoc(doc(db, "chats", chat.id), { createdBy: chat.participants[0] }).catch(()=>{});
+  }
+
   img.src = chat.avatar || '/images/group.png';
-  name.innerHTML = chat.name + (chat.createdBy === currentUser.uid ? ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>' : '');
+  name.innerHTML = chat.name + (isUserAdmin ? ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>' : '');
   memberLabel.innerText = `Members (${chat.participants.length})`;
   
   // Show edit button only for admin
-  if (chat.createdBy === currentUser.uid) editBtn.classList.remove('hidden');
+  if (isUserAdmin) editBtn.classList.remove('hidden');
   else editBtn.classList.add('hidden');
 
   memberList.innerHTML = chat.participants.map((uid, idx) => `
@@ -1014,7 +1028,7 @@ async function openGroupInfo(chat) {
       <div style="display: flex; align-items: center; flex: 1;">
         <img src="${chat.participantAvatars[idx]}" style="width: 32px; height: 32px; border-radius: 50%;">
         <div style="margin-left: 12px;">
-          <h4 style="font-size: 0.9rem;">${chat.participantNames[idx]} ${uid === chat.createdBy ? '<span style="color:var(--accent); font-size:0.6rem; border:1px solid var(--accent); padding:1px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>' : ''}</h4>
+          <h4 style="font-size: 0.9rem;">${chat.participantNames[idx]} ${uid === adminUid ? '<span style="color:var(--accent); font-size:0.6rem; border:1px solid var(--accent); padding:1px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>' : ''}</h4>
           <p style="font-size: 0.7rem; color: var(--text-muted);">@${chat.participantUsernames[idx]}</p>
         </div>
       </div>
@@ -1032,7 +1046,7 @@ async function openGroupInfo(chat) {
         await updateDoc(doc(db, "chats", chat.id), { name: newName });
         name.innerHTML = newName + ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>';
         lucide.createIcons();
-        openGroupInfo({ ...chat, name: newName }); // Refresh modal with new name
+        openGroupInfo({ ...chat, name: newName }); 
       }
     };
   }
