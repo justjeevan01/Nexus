@@ -499,7 +499,7 @@ function renderMessages(messages, filter = '') {
     }
 
     const isSelf = msg.senderId === currentUser.uid;
-    const isRead = currentChat?.participants.every(p => msg.readBy?.includes(p));
+    const isRead = currentChat?.participants?.filter(p => p !== msg.senderId).every(p => msg.readBy?.includes(p));
     
     return dateDivider + `
       <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
@@ -539,7 +539,7 @@ function updateReadReceipts(messages, chat) {
       if (el) {
         const icon = el.querySelector('.status-icon');
         if (icon) {
-          const isRead = chat?.participants.every(p => msg.readBy?.includes(p));
+          const isRead = chat?.participants?.filter(p => p !== msg.senderId).every(p => msg.readBy?.includes(p));
           icon.style.stroke = isRead ? '#34B7F1' : 'currentColor';
           icon.classList.toggle('read', isRead);
         }
@@ -587,7 +587,7 @@ async function uploadChatImage(file) {
     const storageRef = ref(storage, `chat_images/${activeChatId}/${Date.now()}.${ext}`);
     await uploadBytes(storageRef, file);
     const imageUrl = await getDownloadURL(storageRef);
-    await addDoc(msgRef, { text: '', imageUrl, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() });
+    await addDoc(msgRef, { text: '', imageUrl, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp(), readBy: [currentUser.uid] });
     await setDoc(chatRef, { lastMessage: '📷 Image', lastMessageTime: serverTimestamp(), lastMessageSenderId: currentUser.uid }, { merge: true });
   } catch (error) {
     console.error("Image upload failed", error);
