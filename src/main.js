@@ -274,9 +274,14 @@ function loadChats() {
   const q = query(collection(db, "chats"), orderBy("lastMessageTime", "desc"));
   onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
+      const chat = change.doc.data();
+      const chatId = change.doc.id;
+      
+      // ONLY notify if I am a participant (or it's public)
+      const isParticipant = chat.participants?.includes(currentUser.uid) || chat.type === 'public';
+      if (!isParticipant) return;
+
       if (change.type === 'modified') {
-        const chat = change.doc.data();
-        const chatId = change.doc.id;
         if (chat.lastMessageTime && chat.lastMessageSenderId && chat.lastMessageSenderId !== currentUser.uid) {
           const lastTime = chat.lastMessageTime.toMillis();
           if (!lastProcessedTimes[chatId] || lastTime > lastProcessedTimes[chatId]) {
@@ -289,8 +294,7 @@ function loadChats() {
           }
         }
       } else if (change.type === 'added') {
-        const chat = change.doc.data();
-        if (chat.lastMessageTime) lastProcessedTimes[change.doc.id] = chat.lastMessageTime.toMillis();
+        if (chat.lastMessageTime) lastProcessedTimes[chatId] = chat.lastMessageTime.toMillis();
       }
     });
 
@@ -499,7 +503,7 @@ function renderMessages(messages, filter = '') {
         ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
         ${msg.text ? `<p>${msg.text}</p>` : ''}
         <div class="message-time">
-          ${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}
+          ${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Just now'}
           ${isSelf ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${isRead ? '#34B7F1' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="status-icon ${isRead ? 'read' : 'delivered'}"><polyline points="20 6 9 17 4 12"></polyline><polyline points="14 6 7 13 4 10"></polyline></svg>` : ''}
         </div>
         <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
@@ -1002,13 +1006,18 @@ function setupEventListeners() {
         const chatData = chatDoc.data();
         const pIndex = chatData.participants.indexOf(currentUser.uid);
         if (pIndex !== -1) {
-          if (chatData.participantNames) chatData.participantNames[pIndex] = newName;
-          if (chatData.participantUsernames) chatData.participantUsernames[pIndex] = newUsername;
-          if (chatData.participantAvatars) chatData.participantAvatars[pIndex] = currentUser.avatar;
+          const names = chatData.participantNames || [];
+          const usernames = chatData.participantUsernames || [];
+          const avatars = chatData.participantAvatars || [];
+          
+          names[pIndex] = newName;
+          usernames[pIndex] = newUsername;
+          avatars[pIndex] = currentUser.avatar;
+
           batch.update(chatDoc.ref, { 
-            participantNames: chatData.participantNames,
-            participantUsernames: chatData.participantUsernames,
-            participantAvatars: chatData.participantAvatars
+            participantNames: names,
+            participantUsernames: usernames,
+            participantAvatars: avatars
           });
         }
       });
