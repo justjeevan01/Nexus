@@ -575,6 +575,7 @@ async function declineChat() {
 // Expose to window for fail-safe inline HTML execution
 window.acceptChat = acceptChat;
 window.declineChat = declineChat;
+window.startPrivateChat = startPrivateChat;
 
 async function markMessagesAsRead(chatId) {
   if (!chatId || !currentUser) return;
