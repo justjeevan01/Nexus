@@ -556,16 +556,19 @@ async function acceptChat() {
 }
 
 async function declineChat() {
-  if (!activeChatId || !confirm("Decline and delete this chat request?")) return;
+  if (!activeChatId) return;
   const id = activeChatId;
+  
+  // Instantly update UI
   activeChatId = null;
   activeChatScreen.classList.add('hidden');
   welcomeScreen.classList.remove('hidden');
+  
   try {
     await deleteDoc(doc(db, "chats", id));
   } catch (error) {
     console.error("Error declining chat:", error);
-    alert("Failed to decline request.");
+    alert("Failed to completely delete request, but it has been hidden.");
   }
 }
 
