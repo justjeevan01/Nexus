@@ -332,7 +332,8 @@ function loadChats() {
 }
 
 function renderChatList(filter = '') {
-  const filtered = chats.filter(chat => {
+  try {
+    const filtered = chats.filter(chat => {
     const isPending = chat.status === 'pending';
     const isInitiator = chat.initiator === currentUser.uid;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
@@ -395,17 +396,22 @@ function renderChatList(filter = '') {
         </div>
       </div>
     `;
-  }).join('');
-  document.querySelectorAll('.chat-item').forEach(item => item.addEventListener('click', () => switchChat(item.dataset.id)));
+    }).join('');
+    document.querySelectorAll('.chat-item').forEach(item => item.addEventListener('click', () => switchChat(item.dataset.id)));
+  } catch (err) {
+    console.error("Critical error in renderChatList:", err);
+  }
 }
 
 function getPrivateChatName(chat) { 
+  if (!chat || !chat.participants) return "Direct Chat";
   const index = chat.participants.findIndex(uid => uid !== currentUser.uid);
-  return index !== -1 && chat.participantNames ? chat.participantNames[index] : "Direct Chat";
+  return (index !== -1 && chat.participantNames) ? chat.participantNames[index] : "Direct Chat";
 }
 function getPrivateChatAvatar(chat) { 
+  if (!chat || !chat.participants) return "/images/user1.png";
   const index = chat.participants.findIndex(uid => uid !== currentUser.uid);
-  return index !== -1 && chat.participantAvatars ? chat.participantAvatars[index] : "/images/user1.png";
+  return (index !== -1 && chat.participantAvatars) ? chat.participantAvatars[index] : "/images/user1.png";
 }
 
 function switchChat(id) {
@@ -1188,7 +1194,7 @@ async function addMembersToGroup() {
   const updatedUsernames = [...chat.participantUsernames, ...newUsernames];
   const updatedAvatars = [...chat.participantAvatars, ...newAvatars];
 
-  await updateDoc(doc(doc(db, "chats", activeChatId)), {
+  await updateDoc(doc(db, "chats", activeChatId), {
     participants: updatedParticipants,
     participantNames: updatedNames,
     participantUsernames: updatedUsernames,
