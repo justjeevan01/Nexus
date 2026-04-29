@@ -1073,26 +1073,56 @@ async function openGroupInfo(chat) {
   lucide.createIcons();
   modal.classList.remove('hidden');
 
+  // --- ADDED: ENSURE ALL MODAL BUTTONS ARE FUNCTIONAL EVERY TIME IT OPENS ---
+  
+  // Close Button
+  const closeBtn = document.getElementById('close-group-info');
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.preventDefault();
+      modal.classList.add('hidden');
+    };
+  }
+
+  // Add Members Button
+  if (openAddMembersBtn) {
+    openAddMembersBtn.onclick = (e) => {
+      e.preventDefault();
+      addMembersModal.classList.remove('hidden');
+      addMembersSearchInput.value = '';
+      showAddMembersList();
+    };
+  }
+
+  // Dismantle / Leave Button
+  if (leaveBtn) {
+    leaveBtn.onclick = (e) => {
+      e.preventDefault();
+      leaveGroup();
+    };
+  }
+
+  // Rename Button (Existing)
   const editNameBtn = document.getElementById('edit-group-name-btn');
   if (editNameBtn) {
-    editNameBtn.onclick = async () => {
+    editNameBtn.onclick = async (e) => {
+      e.preventDefault();
       const newName = prompt("Enter new group name:", chat.name);
       if (newName && newName !== chat.name) {
         await updateDoc(doc(db, "chats", chat.id), { name: newName });
-        name.innerHTML = newName + ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>';
-        lucide.createIcons();
         openGroupInfo({ ...chat, name: newName }); 
       }
     };
   }
 
-  // Set DP Edit click directly here for absolute reliability
-  editBtn.onclick = () => {
+  // DP Edit click directly here for absolute reliability
+  editBtn.onclick = (e) => {
+    e.preventDefault();
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
+    input.onchange = async (ev) => {
+      const file = ev.target.files[0];
       if (!file || !activeChatId) return;
       const ext = file.name.split('.').pop();
       const storageRef = ref(storage, `group_avatars/${activeChatId}.${ext}`);
@@ -1100,7 +1130,8 @@ async function openGroupInfo(chat) {
       const url = await getDownloadURL(storageRef);
       await updateDoc(doc(db, "chats", activeChatId), { avatar: url });
       img.src = url;
-      document.getElementById('active-chat-avatar').src = url;
+      const headerAvatar = document.getElementById('active-chat-avatar');
+      if (headerAvatar) headerAvatar.src = url;
     };
     input.click();
   };
@@ -1387,12 +1418,6 @@ function setupEventListeners() {
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);
 
-  document.getElementById('close-group-info')?.addEventListener('click', (e) => {
-    document.getElementById('group-info-modal').classList.add('hidden');
-  });
-  document.getElementById('leave-group-btn')?.addEventListener('click', leaveGroup);
-
-  openAddMembersBtn.addEventListener('click', () => { addMembersModal.classList.remove('hidden'); addMembersSearchInput.value = ''; showAddMembersList(); });
   closeAddMembers.addEventListener('click', () => addMembersModal.classList.add('hidden'));
   addMembersSearchInput.addEventListener('input', (e) => showAddMembersList(e.target.value));
   confirmAddMembersBtn.addEventListener('click', addMembersToGroup);
