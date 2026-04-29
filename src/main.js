@@ -308,9 +308,9 @@ function listenToUserStatuses() {
 
 function updateHeaderStatus(chat) {
   const statusEl = document.getElementById('header-status');
-  const typingBox = document.getElementById('typing-indicator-box');
-  const typingText = document.getElementById('typing-text');
-  if (!statusEl || !typingBox) return;
+  const typingBubble = document.getElementById('in-chat-typing');
+  const typingText = document.getElementById('in-chat-typing-text');
+  if (!statusEl || !typingBubble) return;
   
   if (chat.type === 'private') {
     const otherUid = chat.participants.find(uid => uid !== currentUser.uid);
@@ -319,11 +319,11 @@ function updateHeaderStatus(chat) {
     
     if (isTyping) {
       statusEl.innerText = "typing...";
-      typingBox.classList.remove('hidden');
+      typingBubble.classList.remove('hidden');
       typingText.innerText = `${chat.participantNames?.find((n, i) => chat.participants[i] === otherUid) || 'Someone'} is typing...`;
       messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
     } else {
-      typingBox.classList.add('hidden');
+      typingBubble.classList.add('hidden');
       statusEl.innerText = status?.isOnline ? "Online" : "Offline";
     }
   } else {
@@ -333,7 +333,7 @@ function updateHeaderStatus(chat) {
     // Group Typing
     const typingUids = Object.keys(chat.typing || {}).filter(uid => uid !== currentUser.uid && chat.typing[uid]);
     if (typingUids.length > 0) {
-      typingBox.classList.remove('hidden');
+      typingBubble.classList.remove('hidden');
       const names = typingUids.map(uid => {
         const idx = chat.participants.indexOf(uid);
         return idx !== -1 ? chat.participantNames[idx] : 'Someone';
@@ -341,7 +341,7 @@ function updateHeaderStatus(chat) {
       typingText.innerText = `${names} ${typingUids.length > 1 ? 'are' : 'is'} typing...`;
       messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
     } else {
-      typingBox.classList.add('hidden');
+      typingBubble.classList.add('hidden');
     }
   }
 }
