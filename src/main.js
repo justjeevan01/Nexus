@@ -287,15 +287,35 @@ function refreshMessages() {
   });
 }
 
+function formatChatDate(date) {
+  const now = new Date();
+  const d = new Date(date);
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 function renderMessages(messages, filter = '') {
   const filtered = messages.filter(m => (m.text || '').toLowerCase().includes(filter.toLowerCase()));
   const currentChat = chats.find(c => c.id === activeChatId);
   
+  let lastDate = null;
   messagesContainer.innerHTML = filtered.map(msg => {
+    let dateDivider = '';
+    if (msg.timestamp) {
+      const currentDateStr = msg.timestamp.toDate().toDateString();
+      if (currentDateStr !== lastDate) {
+        lastDate = currentDateStr;
+        dateDivider = `<div class="date-divider"><span>${formatChatDate(msg.timestamp.toDate())}</span></div>`;
+      }
+    }
+
     const isSelf = msg.senderId === currentUser.uid;
     const isRead = currentChat?.participants.every(p => msg.readBy?.includes(p));
     
-    return `
+    return dateDivider + `
       <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
         <div class="swipe-indicator"><i data-lucide="reply" style="width:16px;height:16px;"></i></div>
         ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
