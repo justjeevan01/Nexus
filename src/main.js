@@ -19,6 +19,7 @@ let isMuted = false;
 let isVideoOff = false;
 let currentCallUserId = null;
 let replyingToMessage = null;
+let currentSidebarTab = 'chats'; // 'chats' or 'requests'
 
 const servers = {
   iceServers: [
@@ -57,6 +58,14 @@ const msgSearchToggle = document.getElementById('msg-search-toggle');
 const msgSearchBar = document.getElementById('msg-search-bar');
 const msgSearchInput = document.getElementById('msg-search-input');
 const closeMsgSearch = document.getElementById('close-msg-search');
+const chatsTab = document.getElementById('chats-tab');
+const requestsTab = document.getElementById('requests-tab');
+const requestCountBadge = document.getElementById('request-count');
+const requestBanner = document.getElementById('request-banner');
+const requestUserName = document.getElementById('request-user-name');
+const acceptRequestBtn = document.getElementById('accept-request-btn');
+const declineRequestBtn = document.getElementById('decline-request-btn');
+const chatFooter = document.querySelector('.chat-footer');
 const profileBtn = document.querySelector('.user-profile');
 const profileModal = document.getElementById('profile-modal');
 const closeProfile = document.getElementById('close-profile');
@@ -198,13 +207,28 @@ function loadChats() {
 }
 
 function renderChatList(filter = '') {
-  const filteredChats = chats.filter(chat => {
+  const filtered = chats.filter(chat => {
+    const isPending = chat.status === 'pending';
+    const isInitiator = chat.initiator === currentUser.uid;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
-    const matchesName = chatName?.toLowerCase().includes(filter.toLowerCase());
-    const otherParticipantUsername = chat.type === 'private' ? (chat.participantUsernames?.find(u => u !== currentUser.username) || '') : '';
-    return matchesName || otherParticipantUsername.toLowerCase().includes(filter.toLowerCase());
+    const matchesFilter = chatName?.toLowerCase().includes(filter.toLowerCase());
+    
+    if (currentSidebarTab === 'chats') {
+      return (!isPending || isInitiator) && matchesFilter;
+    } else {
+      return (isPending && !isInitiator) && matchesFilter;
+    }
   });
-  chatListEl.innerHTML = filteredChats.map(chat => {
+
+  const pendingCount = chats.filter(c => c.status === 'pending' && c.initiator !== currentUser.uid).length;
+  if (pendingCount > 0) {
+    requestCountBadge.innerText = pendingCount;
+    requestCountBadge.classList.remove('hidden');
+  } else {
+    requestCountBadge.classList.add('hidden');
+  }
+
+  chatListEl.innerHTML = filtered.map(chat => {
     const isActive = chat.id === activeChatId;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
     const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png');
@@ -245,7 +269,33 @@ function switchChat(id) {
   document.querySelector('.chat-window').classList.add('active');
   activeChatInfo.innerHTML = `<img src="${chatAvatar}" alt="${chatName}" class="avatar"><div class="chat-info-text"><h3>${chatName}</h3><span>${chat.type === 'public' ? 'Global Channel' : 'Direct Message'}</span></div>`;
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages(); updateInfoPanel(chat);
-  markMessagesAsRead(id); resetUnreadCount(id);
+  
+  if (chat.status === 'pending' && chat.initiator !== currentUser.uid) {
+    requestBanner.classList.remove('hidden');
+    requestUserName.innerText = chatName;
+    chatFooter.classList.add('hidden');
+  } else {
+    requestBanner.classList.add('hidden');
+    chatFooter.classList.remove('hidden');
+    markMessagesAsRead(id); resetUnreadCount(id);
+  }
+}
+
+async function acceptChat() {
+  if (!activeChatId) return;
+  await updateDoc(doc(db, "chats", activeChatId), { status: 'active' });
+  requestBanner.classList.add('hidden');
+  chatFooter.classList.remove('hidden');
+  markMessagesAsRead(activeChatId); resetUnreadCount(activeChatId);
+}
+
+async function declineChat() {
+  if (!activeChatId || !confirm("Decline and delete this chat request?")) return;
+  const id = activeChatId;
+  activeChatId = null;
+  activeChatScreen.classList.add('hidden');
+  welcomeScreen.classList.remove('hidden');
+  await deleteDoc(doc(db, "chats", id));
 }
 
 async function markMessagesAsRead(chatId) {
@@ -394,30 +444,20 @@ async function showUserList(filter = '') {
   const snapshot = await getDocs(collection(db, "users"));
   const users = snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== currentUser.uid && (u.name?.toLowerCase().includes(filter.toLowerCase()) || (u.username && u.username.toLowerCase().includes(filter.toLowerCase()))));
   
-  userListEl.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted);">No users found.</p>' : users.map(user => {
-    const isFollowing = currentUser.following?.includes(user.uid);
-    const isFollower = currentUser.followers?.includes(user.uid);
-    let btnText = "Follow";
-    let btnClass = "follow-btn";
-    if (isFollowing) { btnText = "Following"; btnClass = "follow-btn following"; }
-    else if (isFollower) { btnText = "Follow Back"; }
-
-    return `
-      <div class="user-item">
-        <div class="user-item-info" data-uid="${user.uid}" data-name="${user.name}" data-avatar="${user.avatar}" data-username="${user.username}" style="display: flex; align-items: center; flex: 1; cursor: pointer;">
-          <img src="${user.avatar}" alt="${user.name}">
-          <div><h4>${user.name}</h4><p>@${user.username || 'unknown'}</p></div>
-        </div>
-        <button class="${btnClass}" onclick="window.toggleFollow('${user.uid}')">${btnText}</button>
+  userListEl.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted);">No users found.</p>' : users.map(user => `
+    <div class="user-item">
+      <div class="user-item-info" data-uid="${user.uid}" data-name="${user.name}" data-avatar="${user.avatar}" data-username="${user.username}" style="display: flex; align-items: center; flex: 1; cursor: pointer;">
+        <img src="${user.avatar}" alt="${user.name}">
+        <div><h4>${user.name}</h4><p>@${user.username || 'unknown'}</p></div>
       </div>
-    `;
-  }).join('');
+      <button class="follow-btn" onclick="startPrivateChat('${user.uid}', '${user.name.replace(/'/g, "\\'")}', '${user.avatar}', '${user.username}')">Message</button>
+    </div>
+  `).join('');
   
   document.querySelectorAll('.user-item-info').forEach(item => item.addEventListener('click', () => startPrivateChat(item.dataset.uid, item.dataset.name, item.dataset.avatar, item.dataset.username)));
 
-  // Populate Group User List (Only Mutuals)
-  const mutuals = users.filter(u => currentUser.following?.includes(u.uid) && currentUser.followers?.includes(u.uid));
-  groupUserList.innerHTML = mutuals.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">You need mutual followers to create a group.</p>' : mutuals.map(user => `
+  // Populate Group User List (All Users)
+  groupUserList.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No users available.</p>' : users.map(user => `
     <div class="user-item" style="padding: 8px 16px;">
       <div style="display: flex; align-items: center; flex: 1;">
         <img src="${user.avatar}" alt="${user.name}" style="width: 32px; height: 32px;">
@@ -464,36 +504,31 @@ async function createGroupChat() {
   }
 }
 
-window.toggleFollow = async function(targetUid) {
-  if (!currentUser) return;
-  const isFollowing = currentUser.following?.includes(targetUid);
-  try {
-    if (isFollowing) {
-      await updateDoc(doc(db, "users", currentUser.uid), { following: arrayRemove(targetUid) });
-      await updateDoc(doc(db, "users", targetUid), { followers: arrayRemove(currentUser.uid) });
-      currentUser.following = currentUser.following.filter(id => id !== targetUid);
-    } else {
-      await updateDoc(doc(db, "users", currentUser.uid), { following: arrayUnion(targetUid) });
-      await updateDoc(doc(db, "users", targetUid), { followers: arrayUnion(currentUser.uid) });
-      if (!currentUser.following) currentUser.following = [];
-      currentUser.following.push(targetUid);
-    }
-    showUserList(userSearchInput.value);
-  } catch (error) {
-    console.error("Failed to toggle follow", error);
-    alert("Could not update follow status.");
-  }
-};
+async function startPrivateChat(uid, name, avatar, username) {
+  if (!uid || uid === currentUser.uid) return;
+  let chat = chats.find(c => c.type === 'private' && c.participants.includes(uid));
+  if (chat) { switchChat(chat.id); newChatModal.classList.add('hidden'); return; }
+  
+  const participants = [currentUser.uid, uid];
+  const participantNames = [currentUser.name, name];
+  const participantUsernames = [currentUser.username, username];
+  const participantAvatars = [currentUser.avatar, avatar];
 
-async function startPrivateChat(otherUid, otherName, otherAvatar, otherUsername) {
-  const isMutual = currentUser.following?.includes(otherUid) && currentUser.followers?.includes(otherUid);
-  if (!isMutual) {
-    alert(`You and ${otherName} must be following each other to chat or call.`);
-    return;
-  }
-  newChatModal.classList.add('hidden'); const chatId = [currentUser.uid, otherUid].sort().join('_'); const chatRef = doc(db, "chats", chatId); const chatSnap = await getDoc(chatRef);
-  if (!chatSnap.exists()) { await setDoc(chatRef, { type: 'private', participants: [currentUser.uid, otherUid], participantNames: [currentUser.name, otherName], participantUsernames: [currentUser.username, otherUsername], participantAvatars: [currentUser.avatar, otherAvatar], lastMessage: "Start of your private conversation", lastMessageTime: serverTimestamp() }); }
-  switchChat(chatId);
+  const docRef = await addDoc(collection(db, "chats"), {
+    type: 'private',
+    participants,
+    participantNames,
+    participantUsernames,
+    participantAvatars,
+    status: 'pending',
+    initiator: currentUser.uid,
+    lastMessage: "New Chat Request",
+    lastMessageTime: serverTimestamp(),
+    unreadCounts: { [uid]: 1, [currentUser.uid]: 0 }
+  });
+  
+  newChatModal.classList.add('hidden');
+  switchChat(docRef.id);
 }
 
 function updateInfoPanel(chat) {
@@ -861,6 +896,11 @@ function setupEventListeners() {
   msgSearchToggle.addEventListener('click', () => { msgSearchBar.classList.toggle('hidden'); if (!msgSearchBar.classList.contains('hidden')) msgSearchInput.focus(); else { msgSearchInput.value = ''; renderMessages(activeMessages); } });
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
+
+  chatsTab.addEventListener('click', () => { currentSidebarTab = 'chats'; chatsTab.classList.add('active'); requestsTab.classList.remove('active'); renderChatList(); });
+  requestsTab.addEventListener('click', () => { currentSidebarTab = 'requests'; requestsTab.classList.add('active'); chatsTab.classList.remove('active'); renderChatList(); });
+  acceptRequestBtn.addEventListener('click', acceptChat);
+  declineRequestBtn.addEventListener('click', declineChat);
 
   // --- SWIPE TO REPLY LOGIC ---
   let startX = 0;

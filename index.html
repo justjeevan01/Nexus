@@ -84,6 +84,11 @@
           </div>
         </header>
 
+        <div class="sidebar-tabs">
+          <button class="tab-btn active" id="chats-tab">Chats</button>
+          <button class="tab-btn" id="requests-tab">Requests <span id="request-count" class="badge hidden">0</span></button>
+        </div>
+
         <div class="search-container">
           <div class="search-bar">
             <i data-lucide="search"></i>
@@ -139,6 +144,14 @@
 
           <div class="messages-container" id="messages-container">
             <!-- Messages injected here -->
+          </div>
+
+          <div id="request-banner" class="request-banner hidden">
+            <p><strong><span id="request-user-name">User</span></strong> wants to message you.</p>
+            <div class="request-actions">
+              <button class="accept-btn" id="accept-request-btn">Accept</button>
+              <button class="decline-btn" id="decline-request-btn">Decline</button>
+            </div>
           </div>
 
           <footer class="chat-footer" style="position: relative;">
