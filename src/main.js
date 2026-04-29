@@ -1,7 +1,7 @@
 import './style.css';
 import { auth, googleProvider, db, storage } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove, writeBatch, increment } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove, writeBatch, increment, deleteField } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- STATE ---
@@ -55,6 +55,8 @@ window.handleTabClick = (tab) => {
 let startX = 0;
 let currentEl = null;
 let isSwiping = false;
+let longPressTimer = null;
+let activeReactionMsgId = null;
 
 const handleStart = (clientX, target, e) => {
   const msg = target.closest('.message');
@@ -64,14 +66,30 @@ const handleStart = (clientX, target, e) => {
     isSwiping = true; 
     currentEl.style.transition = 'none';
     document.body.style.userSelect = 'none';
-    // Removed touchstart preventDefault to allow vertical scrolling on mobile
+    
+    // Long press detection for emoji reactions
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      isSwiping = false; // Cancel swipe
+      const msgId = msg.id.replace('msg-', '');
+      const rect = msg.getBoundingClientRect();
+      const picker = document.getElementById('reaction-picker');
+      picker.style.top = `${rect.top - 20}px`;
+      picker.style.left = `${Math.min(Math.max(rect.left + rect.width / 2, 100), window.innerWidth - 100)}px`;
+      picker.classList.remove('hidden');
+      activeReactionMsgId = msgId;
+      if (navigator.vibrate) navigator.vibrate(20);
+    }, 400);
   }
 };
 
 const handleMove = (clientX, e) => {
   if (!isSwiping || !currentEl) return;
   const diff = clientX - startX;
-  if (Math.abs(diff) > 10 && e.cancelable) e.preventDefault();
+  if (Math.abs(diff) > 10) {
+    if (longPressTimer) clearTimeout(longPressTimer); // Cancel long press if moved
+    if (e.cancelable) e.preventDefault();
+  }
   if (diff > 0 && diff < 80) {
     currentEl.style.transform = `translateX(${diff}px)`;
     const indicator = currentEl.querySelector('.swipe-indicator');
@@ -84,6 +102,7 @@ const handleMove = (clientX, e) => {
 };
 
 const handleEnd = (clientX) => {
+  if (longPressTimer) clearTimeout(longPressTimer);
   if (!isSwiping || !currentEl) return;
   const diff = clientX - startX;
   currentEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
@@ -672,26 +691,40 @@ function renderMessages(messages, filter = '') {
       }
     }
     
-    return dateDivider + `
-      <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${displaySenderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
-        <div class="swipe-indicator"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></div>
-        ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${displaySenderName}</span>` : ''}
-        ${msg.replyTo ? `
-          <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
-            <strong>${replySenderName}</strong>
-            ${msg.replyTo.text || 'Photo'}
+      let reactionsHtml = '';
+      if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+        const reactionCounts = {};
+        Object.values(msg.reactions).forEach(emoji => {
+          reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+        });
+        reactionsHtml = '<div class="reaction-container">' + 
+          Object.entries(reactionCounts).map(([emoji, count]) => 
+            `<div class="reaction-badge">${emoji} ${count > 1 ? count : ''}</div>`
+          ).join('') +
+        '</div>';
+      }
+      
+      return dateDivider + `
+        <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${displaySenderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
+          <div class="swipe-indicator"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></div>
+          ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${displaySenderName}</span>` : ''}
+          ${msg.replyTo ? `
+            <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
+              <strong>${replySenderName}</strong>
+              ${msg.replyTo.text || 'Photo'}
+            </div>
+          ` : ''}
+          ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
+          ${msg.text ? `<p>${msg.text}</p>` : ''}
+          <div class="message-time">
+            ${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Just now'}
+            ${isSelf ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${isRead ? '#34B7F1' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="status-icon ${isRead ? 'read' : 'delivered'}"><polyline points="20 6 9 17 4 12"></polyline><polyline points="14 6 7 13 4 10"></polyline></svg>` : ''}
           </div>
-        ` : ''}
-        ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
-        ${msg.text ? `<p>${msg.text}</p>` : ''}
-        <div class="message-time">
-          ${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Just now'}
-          ${isSelf ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${isRead ? '#34B7F1' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="status-icon ${isRead ? 'read' : 'delivered'}"><polyline points="20 6 9 17 4 12"></polyline><polyline points="14 6 7 13 4 10"></polyline></svg>` : ''}
+          <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
+          </div>
+          ${reactionsHtml}
         </div>
-        <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
-        </div>
-      </div>
     `;
   }).join(''); 
 
@@ -729,6 +762,27 @@ window.setReply = function(id, name, text) {
 function cancelReply() {
   replyingToMessage = null;
   document.getElementById('reply-preview').classList.add('hidden');
+}
+
+async function reactToMessage(msgId, emoji) {
+  if (!activeChatId || !currentUser) return;
+  const msgRef = doc(db, "chats", activeChatId, "messages", msgId);
+  const msgDoc = await getDoc(msgRef);
+  if (msgDoc.exists()) {
+    const data = msgDoc.data();
+    const reactions = data.reactions || {};
+    
+    // Toggle reaction off if they selected the same one
+    if (reactions[currentUser.uid] === emoji) {
+      await updateDoc(msgRef, {
+        [`reactions.${currentUser.uid}`]: deleteField()
+      });
+    } else {
+      await updateDoc(msgRef, {
+        [`reactions.${currentUser.uid}`]: emoji
+      });
+    }
+  }
 }
 
 async function sendMessage() {
@@ -1585,6 +1639,39 @@ function setupEventListeners() {
 
   window.addEventListener('mousemove', (e) => { if (isSwiping) { e.preventDefault(); handleMove(e.clientX, e); } });
   window.addEventListener('mouseup', (e) => { if (isSwiping) handleEnd(e.clientX); });
+  
+  // Right-click for desktop reactions
+  messagesContainer.addEventListener('contextmenu', (e) => {
+    const msg = e.target.closest('.message');
+    if (msg) {
+      e.preventDefault();
+      const msgId = msg.id.replace('msg-', '');
+      const picker = document.getElementById('reaction-picker');
+      picker.style.top = `${e.clientY - 20}px`;
+      picker.style.left = `${Math.min(Math.max(e.clientX, 100), window.innerWidth - 100)}px`;
+      picker.classList.remove('hidden');
+      activeReactionMsgId = msgId;
+    }
+  });
+
+  // Reaction picker clicks
+  document.querySelectorAll('.reaction-emoji-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      if (activeReactionMsgId) {
+        reactToMessage(activeReactionMsgId, e.target.dataset.emoji);
+      }
+      document.getElementById('reaction-picker').classList.add('hidden');
+      activeReactionMsgId = null;
+    });
+  });
+
+  // Hide reaction picker on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#reaction-picker') && !e.target.closest('.message')) {
+      document.getElementById('reaction-picker').classList.add('hidden');
+      activeReactionMsgId = null;
+    }
+  });
 }
 
 function updateProfileUI() { if (!currentUser) return; document.querySelector('.user-profile img').src = currentUser.avatar; document.getElementById('my-profile-img').src = currentUser.avatar; myNameInput.value = currentUser.name; myUsernameInput.value = currentUser.username || ''; myStatusInput.value = currentUser.status; }

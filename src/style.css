@@ -1487,6 +1487,65 @@ img.emoji {
   z-index: 10;
 }
 
+/* Reaction Picker */
+.reaction-picker-modal {
+  position: absolute;
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 6px 12px;
+  display: flex;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 100;
+  transform: translateY(-50%) translateX(-50%);
+  animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.reaction-emoji-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: transform 0.1s;
+}
+
+.reaction-emoji-btn:hover {
+  transform: scale(1.3);
+  background: var(--glass);
+}
+
+/* Reaction Badges on Messages */
+.reaction-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  position: absolute;
+  bottom: -12px;
+  left: 12px;
+  z-index: 5;
+}
+
+.message.self .reaction-container {
+  left: auto;
+  right: 12px;
+}
+
+.reaction-badge {
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .sidebar { 
