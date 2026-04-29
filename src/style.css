@@ -784,10 +784,10 @@ img.emoji {
 }
 
 .chat-footer {
-  padding: 20px 24px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   background: var(--bg-sidebar);
 }
 
@@ -797,18 +797,30 @@ img.emoji {
   background: var(--bg-chat);
   border: 1px solid var(--border);
   border-radius: 24px;
+  min-width: 0; /* Prevents flex blowout */
 }
 
 .reply-preview {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: 8px 16px;
   background: var(--bg-chat);
   border-bottom: 1px solid var(--border);
   border-radius: 24px 24px 0 0;
   border-left: 3px solid var(--accent);
   margin: -1px -1px 0 -1px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.reply-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .reply-preview-content span {
@@ -824,17 +836,18 @@ img.emoji {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 300px;
+  margin: 0;
 }
 
 .message-input-wrapper input {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 16px 24px;
+  padding: 12px 16px;
   color: var(--text-primary);
   outline: none;
   font-size: 0.95rem;
+  min-width: 0; /* Prevents flex blowout */
 }
 
 .send-btn {
