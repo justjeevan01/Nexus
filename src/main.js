@@ -366,7 +366,7 @@ function renderChatList(filter = '') {
     return;
   }
 
-  chatListEl.innerHTML = filtered.map(chat => {
+  const html = filtered.map(chat => {
     const isActive = chat.id === activeChatId;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
     const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/group.png');
@@ -397,8 +397,13 @@ function renderChatList(filter = '') {
         </div>
       </div>
     `;
-    }).join('');
-    document.querySelectorAll('.chat-item').forEach(item => item.addEventListener('click', () => switchChat(item.dataset.id)));
+  }).join('');
+
+  chatListEl.innerHTML = html;
+  document.querySelectorAll('.chat-item').forEach(item => {
+    item.onclick = () => switchChat(item.dataset.id);
+  });
+
   } catch (err) {
     console.error("Critical error in renderChatList:", err);
   }
@@ -1084,13 +1089,18 @@ async function openGroupInfo(chat) {
     };
   }
 
-  // Add Members Button
+  // Add Members Button & its internal listeners
   if (openAddMembersBtn) {
     openAddMembersBtn.onclick = (e) => {
       e.preventDefault();
       addMembersModal.classList.remove('hidden');
       addMembersSearchInput.value = '';
       showAddMembersList();
+      
+      // Ensure Add Modal buttons work
+      closeAddMembers.onclick = () => addMembersModal.classList.add('hidden');
+      addMembersSearchInput.oninput = (ev) => showAddMembersList(ev.target.value);
+      confirmAddMembersBtn.onclick = () => addMembersToGroup();
     };
   }
 
@@ -1400,21 +1410,21 @@ function setupEventListeners() {
   closeMsgSearch.addEventListener('click', () => { msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; renderMessages(activeMessages); });
   msgSearchInput.addEventListener('input', (e) => renderMessages(activeMessages, e.target.value));
 
-  chatsTab.addEventListener('click', () => { 
-    console.log("Switching to Chats tab");
+  chatsTab.onclick = (e) => {
+    e.preventDefault();
     currentSidebarTab = 'chats'; 
     chatsTab.classList.add('active'); 
     requestsTab.classList.remove('active'); 
     renderChatList(); 
-  });
-  requestsTab.addEventListener('click', () => { 
-    console.log("Switching to Requests tab");
-    console.table(chats.map(c => ({ id: c.id, status: c.status, initiator: c.initiator, type: c.type })));
+  };
+  
+  requestsTab.onclick = (e) => {
+    e.preventDefault();
     currentSidebarTab = 'requests'; 
     requestsTab.classList.add('active'); 
     chatsTab.classList.remove('active'); 
     renderChatList(); 
-  });
+  };
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);
 
