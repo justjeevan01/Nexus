@@ -368,7 +368,7 @@ function renderChatList(filter = '') {
   chatListEl.innerHTML = filtered.map(chat => {
     const isActive = chat.id === activeChatId;
     const chatName = chat.type === 'private' ? getPrivateChatName(chat) : chat.name;
-    const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/bot.png');
+    const chatAvatar = chat.type === 'private' ? getPrivateChatAvatar(chat) : (chat.avatar || '/images/group.png');
     
     let onlineStatusHtml = '';
     if (chat.type === 'private') {
