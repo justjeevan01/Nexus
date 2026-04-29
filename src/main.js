@@ -64,15 +64,6 @@ const handleStart = (clientX, target, e) => {
     isSwiping = true; 
     currentEl.style.transition = 'none';
     document.body.style.userSelect = 'none';
-    // Position indicator using fixed coords to bypass any overflow:hidden ancestor
-    const indicator = currentEl.querySelector('.swipe-indicator');
-    if (indicator) {
-      const rect = currentEl.getBoundingClientRect();
-      indicator.style.top = (rect.top + rect.height / 2 - 16) + 'px';
-      indicator.style.left = (rect.left - 45) + 'px';
-      indicator.style.opacity = '0';
-      indicator.style.transform = 'scale(0.5)';
-    }
     // Removed touchstart preventDefault to allow vertical scrolling on mobile
   }
 };
@@ -87,10 +78,7 @@ const handleMove = (clientX, e) => {
     if (indicator) {
       const progress = Math.min(diff / 60, 1);
       indicator.style.opacity = progress;
-      indicator.style.transform = `scale(${0.5 + progress * 0.7})`;
-      // Update left position as message moves right (rect.left already includes the CSS transform)
-      const rect = currentEl.getBoundingClientRect();
-      indicator.style.left = (rect.left - 45) + 'px';
+      indicator.style.transform = `translateY(-50%) scale(${0.5 + progress * 0.7})`;
     }
   }
 };
@@ -103,7 +91,7 @@ const handleEnd = (clientX) => {
   const indicator = currentEl.querySelector('.swipe-indicator');
   if (indicator) { 
     indicator.style.opacity = '0'; 
-    indicator.style.transform = 'scale(0.5)'; 
+    indicator.style.transform = 'translateY(-50%) scale(0.5)'; 
   }
   if (diff > 60) {
     if (navigator.vibrate) navigator.vibrate(10);
@@ -132,6 +120,7 @@ const welcomeScreen = document.getElementById('welcome-screen');
 const activeChatScreen = document.getElementById('active-chat');
 const activeChatInfo = document.getElementById('active-chat-info');
 const messagesContainer = document.getElementById('messages-container');
+const messagesScrollWrapper = document.getElementById('messages-scroll-wrapper');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const attachBtn = document.getElementById('attach-btn');
@@ -332,7 +321,7 @@ function updateHeaderStatus(chat) {
       statusEl.innerText = "typing...";
       typingBox.classList.remove('hidden');
       typingText.innerText = `${chat.participantNames?.find((n, i) => chat.participants[i] === otherUid) || 'Someone'} is typing...`;
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
     } else {
       typingBox.classList.add('hidden');
       statusEl.innerText = status?.isOnline ? "Online" : "Offline";
@@ -350,7 +339,7 @@ function updateHeaderStatus(chat) {
         return idx !== -1 ? chat.participantNames[idx] : 'Someone';
       }).join(', ');
       typingText.innerText = `${names} ${typingUids.length > 1 ? 'are' : 'is'} typing...`;
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
     } else {
       typingBox.classList.add('hidden');
     }
@@ -669,7 +658,7 @@ function renderMessages(messages, filter = '') {
   lastRenderedChatId = messageStateKey;
   
   if (window.twemoji) twemoji.parse(messagesContainer);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  messagesScrollWrapper.scrollTop = messagesScrollWrapper.scrollHeight;
   lucide.createIcons();
 }
 
@@ -1544,10 +1533,10 @@ function setupEventListeners() {
   messagesContainer.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.target, e), { passive: false });
   messagesContainer.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX, e), { passive: false });
   messagesContainer.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX), { passive: true });
+  messagesContainer.addEventListener('touchcancel', (e) => { if (isSwiping) handleEnd(startX); }, { passive: true });
 
   messagesContainer.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    e.preventDefault(); // Prevent text selection from interfering with swipe
     handleStart(e.clientX, e.target, e);
   });
 
