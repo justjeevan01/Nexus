@@ -572,6 +572,10 @@ async function declineChat() {
   }
 }
 
+// Expose to window for fail-safe inline HTML execution
+window.acceptChat = acceptChat;
+window.declineChat = declineChat;
+
 async function markMessagesAsRead(chatId) {
   if (!chatId || !currentUser) return;
   const q = query(collection(db, "chats", chatId, "messages"), where("senderId", "!=", currentUser.uid));
