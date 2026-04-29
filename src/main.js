@@ -25,6 +25,7 @@ let typingTimeout = null;
 let lastProcessedTimes = {};
 let lastRenderedChatId = null;
 let lastRenderedMessageCount = 0;
+let messageListener = null;
 
 const servers = {
   iceServers: [
