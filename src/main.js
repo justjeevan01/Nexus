@@ -699,6 +699,7 @@ async function createGroupChat() {
       participantNames,
       participantUsernames,
       participantAvatars,
+      createdBy: currentUser.uid,
       lastMessage: "Group created",
       lastMessageTime: serverTimestamp()
     });
@@ -1001,7 +1002,7 @@ async function openGroupInfo(chat) {
   const editBtn = document.getElementById('edit-group-img-btn');
 
   img.src = chat.avatar || '/images/group.png';
-  name.innerText = chat.name;
+  name.innerHTML = chat.name + (chat.createdBy === currentUser.uid ? ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>' : '');
   memberLabel.innerText = `Members (${chat.participants.length})`;
   
   // Show edit button only for admin
@@ -1020,7 +1021,17 @@ async function openGroupInfo(chat) {
     </div>
   `).join('');
 
+  lucide.createIcons();
   modal.classList.remove('hidden');
+
+  document.getElementById('edit-group-name-btn')?.onclick = async () => {
+    const newName = prompt("Enter new group name:", chat.name);
+    if (newName && newName !== chat.name) {
+      await updateDoc(doc(db, "chats", chat.id), { name: newName });
+      name.innerHTML = newName + ' <button id="edit-group-name-btn" class="icon-btn" style="display:inline; padding:2px;"><i data-lucide="edit-2" style="width:14px;"></i></button>';
+      lucide.createIcons();
+    }
+  };
 }
 
 async function leaveGroup() {
@@ -1229,7 +1240,11 @@ function setupEventListeners() {
   acceptRequestBtn.addEventListener('click', acceptChat);
   declineRequestBtn.addEventListener('click', declineChat);
 
-  document.getElementById('close-group-info')?.addEventListener('click', () => document.getElementById('group-info-modal').classList.add('hidden'));
+  document.getElementById('close-group-info')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById('group-info-modal').classList.add('hidden');
+  });
   document.getElementById('leave-group-btn')?.addEventListener('click', leaveGroup);
   document.getElementById('edit-group-img-btn')?.addEventListener('click', () => {
     const input = document.createElement('input');
