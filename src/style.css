@@ -561,13 +561,36 @@ img.emoji {
 }
 
 .status-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
 }
 
+.status-icon.sent {
+  color: var(--text-muted);
+}
+
+.status-icon.delivered {
+  color: var(--text-muted);
+}
+
 .status-icon.read {
-  color: var(--accent);
+  color: #34B7F1 !important;
+}
+
+.unread-badge {
+  background: var(--accent);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  margin-top: 4px;
 }
 
 .chat-footer {

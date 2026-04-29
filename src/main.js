@@ -1,7 +1,7 @@
 import './style.css';
 import { auth, googleProvider, db, storage } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove, writeBatch } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, doc, getDoc, setDoc, getDocs, limit, deleteDoc, updateDoc, arrayUnion, arrayRemove, writeBatch, increment } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- STATE ---
@@ -212,8 +212,14 @@ function renderChatList(filter = '') {
       <div class="chat-item ${isActive ? 'active' : ''}" data-id="${chat.id}">
         <img src="${chatAvatar}" alt="${chatName}" class="avatar">
         <div class="chat-item-content">
-          <div class="chat-item-header"><h3>${chatName}</h3><span class="chat-time">${chat.lastMessageTime ? new Date(chat.lastMessageTime.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</span></div>
-          <p class="chat-preview">${chat.lastMessage || 'Start a conversation'}</p>
+          <div class="chat-item-header">
+            <h3>${chatName}</h3>
+            <span class="chat-time">${chat.lastMessageTime ? new Date(chat.lastMessageTime.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <p class="chat-preview">${chat.lastMessage || 'Start a conversation'}</p>
+            ${chat.unreadCounts?.[currentUser.uid] > 0 ? `<span class="unread-badge">${chat.unreadCounts[currentUser.uid]}</span>` : ''}
+          </div>
         </div>
       </div>
     `;
@@ -239,34 +245,78 @@ function switchChat(id) {
   document.querySelector('.chat-window').classList.add('active');
   activeChatInfo.innerHTML = `<img src="${chatAvatar}" alt="${chatName}" class="avatar"><div class="chat-info-text"><h3>${chatName}</h3><span>${chat.type === 'public' ? 'Global Channel' : 'Direct Message'}</span></div>`;
   msgSearchBar.classList.add('hidden'); msgSearchInput.value = ''; refreshMessages(); updateInfoPanel(chat);
+  markMessagesAsRead(id); resetUnreadCount(id);
+}
+
+async function markMessagesAsRead(chatId) {
+  if (!chatId || !currentUser) return;
+  const q = query(collection(db, "chats", chatId, "messages"), where("senderId", "!=", currentUser.uid));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  let count = 0;
+  snap.forEach(d => {
+    const data = d.data();
+    if (!data.readBy?.includes(currentUser.uid)) {
+      batch.update(d.ref, { readBy: arrayUnion(currentUser.uid) });
+      count++;
+    }
+  });
+  if (count > 0) await batch.commit();
+}
+
+async function resetUnreadCount(chatId) {
+  if (!chatId || !currentUser) return;
+  await updateDoc(doc(db, "chats", chatId), { [`unreadCounts.${currentUser.uid}`]: 0 });
 }
 
 function refreshMessages() {
   if (!activeChatId) return; if (messageListener) messageListener();
   const msgQuery = query(collection(db, "chats", activeChatId, "messages"), orderBy("timestamp", "asc"));
-  messageListener = onSnapshot(msgQuery, (snapshot) => { activeMessages = snapshot.docs.map(doc => doc.data()); renderMessages(activeMessages, msgSearchInput.value); });
+  messageListener = onSnapshot(msgQuery, (snapshot) => { 
+    activeMessages = snapshot.docs.map(doc => doc.data()); 
+    renderMessages(activeMessages, msgSearchInput.value); 
+    
+    // Real-time mark as read
+    const unread = snapshot.docs.filter(d => d.data().senderId !== currentUser.uid && !d.data().readBy?.includes(currentUser.uid));
+    if (unread.length > 0) {
+      const batch = writeBatch(db);
+      unread.forEach(d => batch.update(d.ref, { readBy: arrayUnion(currentUser.uid) }));
+      batch.commit();
+      resetUnreadCount(activeChatId);
+    }
+  });
 }
 
 function renderMessages(messages, filter = '') {
   const filtered = messages.filter(m => (m.text || '').toLowerCase().includes(filter.toLowerCase()));
-  messagesContainer.innerHTML = filtered.map(msg => `
-    <div class="message ${msg.senderId === currentUser.uid ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
-      <div class="swipe-indicator"><i data-lucide="reply" style="width:16px;height:16px;"></i></div>
-      ${msg.senderId !== currentUser.uid ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
-      ${msg.replyTo ? `
-        <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
-          <strong>${msg.replyTo.senderName}</strong>
-          ${msg.replyTo.text || 'Photo'}
+  const currentChat = chats.find(c => c.id === activeChatId);
+  
+  messagesContainer.innerHTML = filtered.map(msg => {
+    const isSelf = msg.senderId === currentUser.uid;
+    const isRead = currentChat?.participants.every(p => msg.readBy?.includes(p));
+    
+    return `
+      <div class="message ${isSelf ? 'self' : 'other'}" id="msg-${msg.id}" data-sender="${msg.senderName.replace(/'/g, "\\'")}" data-text="${(msg.text || 'Photo').replace(/'/g, "\\'")}">
+        <div class="swipe-indicator"><i data-lucide="reply" style="width:16px;height:16px;"></i></div>
+        ${!isSelf ? `<span style="font-size: 0.7rem; color: var(--accent); display: block; margin-bottom: 4px;">${msg.senderName}</span>` : ''}
+        ${msg.replyTo ? `
+          <div class="quoted-message" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior:'smooth'})">
+            <strong>${msg.replyTo.senderName}</strong>
+            ${msg.replyTo.text || 'Photo'}
+          </div>
+        ` : ''}
+        ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
+        ${msg.text ? `<p>${msg.text}</p>` : ''}
+        <div class="message-time">
+          ${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}
+          ${isSelf ? `<i data-lucide="check-check" class="status-icon ${isRead ? 'read' : 'delivered'}"></i>` : ''}
         </div>
-      ` : ''}
-      ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" alt="Shared image" onclick="window.open('${msg.imageUrl}', '_blank')">` : ''}
-      ${msg.text ? `<p>${msg.text}</p>` : ''}
-      <div class="message-time">${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}${msg.senderId === currentUser.uid ? `<i data-lucide="check-check" class="status-icon read"></i>` : ''}</div>
-      <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
-        <i data-lucide="reply" style="width:14px;height:14px;"></i>
+        <div class="message-reply-btn" onclick="window.setReply('${msg.id}', '${msg.senderName.replace(/'/g, "\\'")}', '${(msg.text || 'Photo').replace(/'/g, "\\'")}')">
+          <i data-lucide="reply" style="width:14px;height:14px;"></i>
+        </div>
       </div>
-    </div>
-  `).join(''); 
+    `;
+  }).join(''); 
   lucide.createIcons(); 
   if (window.twemoji) twemoji.parse(messagesContainer);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -286,18 +336,20 @@ function cancelReply() {
 }
 
 async function sendMessage() {
-  const text = messageInput.value.trim(); if (!text && !replyingToMessage) return; // allow sending just a reply without text? No, require text.
+  const text = messageInput.value.trim(); if (!text && !replyingToMessage) return;
   if (!text || !activeChatId) return;
   const chatRef = doc(db, "chats", activeChatId); const msgRef = collection(chatRef, "messages"); messageInput.value = '';
   
-  const msgData = { text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp() };
-  if (replyingToMessage) {
-    msgData.replyTo = replyingToMessage;
-    cancelReply();
-  }
+  const msgData = { text, senderId: currentUser.uid, senderName: currentUser.name, timestamp: serverTimestamp(), readBy: [currentUser.uid] };
+  if (replyingToMessage) { msgData.replyTo = replyingToMessage; cancelReply(); }
   
-  await addDoc(msgRef, msgData);
-  await setDoc(chatRef, { lastMessage: text, lastMessageTime: serverTimestamp() }, { merge: true });
+  const docRef = await addDoc(msgRef, msgData);
+  await updateDoc(doc(db, "chats", activeChatId, "messages", docRef.id), { id: docRef.id });
+
+  const chat = chats.find(c => c.id === activeChatId);
+  const updates = { lastMessage: text, lastMessageTime: serverTimestamp() };
+  chat.participants.forEach(p => { if (p !== currentUser.uid) updates[`unreadCounts.${p}`] = increment(1); });
+  await updateDoc(chatRef, updates);
 }
 
 async function uploadChatImage(file) {
