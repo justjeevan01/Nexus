@@ -799,15 +799,13 @@ async function showUserList(filter = '') {
   
   userListEl.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted);">No users found.</p>' : users.map(user => `
     <div class="user-item">
-      <div class="user-item-info" data-uid="${user.uid}" data-name="${user.name}" data-avatar="${user.avatar}" data-username="${user.username}" style="display: flex; align-items: center; flex: 1; cursor: pointer;">
+      <div class="user-item-info" data-uid="${user.uid}" data-name="${user.name}" data-avatar="${user.avatar}" data-username="${user.username}" style="display: flex; align-items: center; flex: 1;">
         <img src="${user.avatar}" alt="${user.name}">
         <div><h4>${user.name}</h4><p>@${user.username || 'unknown'}</p></div>
       </div>
       <button class="follow-btn" onclick="startPrivateChat('${user.uid}', '${user.name.replace(/'/g, "\\'")}', '${user.avatar}', '${user.username}')">Message</button>
     </div>
   `).join('');
-  
-  document.querySelectorAll('.user-item-info').forEach(item => item.addEventListener('click', () => startPrivateChat(item.dataset.uid, item.dataset.name, item.dataset.avatar, item.dataset.username)));
 
   // Populate Group User List (All Users)
   groupUserList.innerHTML = users.length === 0 ? '<p style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No users available.</p>' : users.map(user => `
